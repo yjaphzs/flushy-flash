@@ -65,6 +65,17 @@ skip the download:
 npx firebase-tools apps:sdkconfig android --project <your-project-id> > google-services.json
 ```
 
+**Refreshing the config.** If you register a new SHA-1 or change apps, re-pull it
+rather than hand-editing:
+
+```bash
+npm run firebase:sdkconfig    # overwrites google-services.json
+```
+
+Do not use `... > google-services.json` — a shell redirect writes the CLI's error
+text into the file when the command fails, producing a file that looks present but
+is not JSON.
+
 **Option B — emulators only.** No Firebase account required; good for UI work.
 
 ```bash
@@ -80,8 +91,13 @@ Deploy the security rules **before** running the app — they are the actual
 security boundary, not a formality:
 
 ```bash
-npx firebase-tools@latest deploy --only firestore:rules,firestore:indexes,storage,database
+npm run test:rules     # prove them first: 37 adversarial cases
+npm run deploy:rules   # firestore rules + indexes, RTDB, storage
 ```
+
+In CI, `firebase-rules.yml` does exactly this on every push to `main` that touches
+a rules file — but only after the attack matrix passes. It needs two repo secrets:
+`FIREBASE_TOKEN` (from `npx firebase-tools login:ci`) and `FIREBASE_PROJECT_ID`.
 
 Seed the campus buildings from OpenStreetMap (see below), then build:
 

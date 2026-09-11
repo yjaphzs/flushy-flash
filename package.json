@@ -18,7 +18,9 @@
     "typecheck:all": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json && npm --prefix rules run typecheck",
     "prebuild:android": "node scripts/check-firebase-config.mjs --platform android && expo prebuild --platform android --clean",
     "firebase:placeholder": "node scripts/make-placeholder-firebase-config.mjs",
-    "firebase:emulators": "npx --yes firebase-tools@15.30.0 emulators:start"
+    "firebase:emulators": "npx --yes firebase-tools@15.30.0 emulators:start",
+    "deploy:rules": "npx --yes firebase-tools@15.30.0 deploy --project flushy-flash --only firestore:rules,firestore:indexes,database,storage --non-interactive",
+    "firebase:sdkconfig": "npx --yes firebase-tools@15.30.0 apps:sdkconfig android --project flushy-flash --out google-services.json"
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.14",

@@ -261,6 +261,37 @@ move only via a deliberate `expo-upgrade`.
 
 ---
 
+## 11. Firebase project (live)
+
+Project `flushy-flash` (number 908364466191), region **asia-southeast1** for both
+Firestore and Realtime Database — nearest to Nueva Ecija, and **permanent**.
+
+| Service | State |
+|---|---|
+| Firestore | Standard edition, Native mode, asia-southeast1. Rules + indexes deployed |
+| Realtime Database | asia-southeast1, rules deployed |
+| Storage | provisioned, rules deployed |
+| Auth | Email/Password **and Google** enabled |
+
+Android app id `1:908364466191:android:56479030081484f70d3b7a`, package
+`xyz.yjaphzs.flushyflash`. Both the shared Expo debug keystore and the project's
+release keystore have their SHA-1 registered, so `google-services.json` carries
+two `client_type: 1` OAuth clients plus the `client_type: 3` web client.
+
+⚠️ **Google Sign-In is enabled in Firebase but NOT implemented in the app.**
+`src/features/auth/api.ts` only does email/password, and
+`@react-native-google-signin/google-signin` is not installed. Enabling the
+provider in the console does nothing on its own. Implementing it needs that
+package, `GoogleSignin.configure({ webClientId })` with the `client_type: 3`
+client id, and `signInWithCredential(GoogleAuthProvider.credential(idToken))`.
+
+**Any new SHA-1 requires regenerating `google-services.json`** (`npm run
+firebase:sdkconfig`) and updating the `GOOGLE_SERVICES_JSON` CI secret. A release
+APK signed by a keystore whose SHA-1 is not registered will fail Google Sign-In
+with a bare `DEVELOPER_ERROR` and no useful message.
+
+---
+
 ## 11. Environment configuration
 
 `src/lib/env.ts` is the single typed entry point; `.env.example` documents every
