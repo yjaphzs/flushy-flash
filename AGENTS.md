@@ -285,6 +285,16 @@ your LAN IP.
 keys get scraped for signup spam and quota burn. CI reads it from the
 `GOOGLE_SERVICES_JSON` secret.
 
+Because it is required at prebuild and absent from every fresh clone,
+`npm run prebuild` runs `scripts/check-firebase-config.mjs` first. Without it the
+failure is a raw ENOENT inside `withAndroidDangerousBaseMod`, which says nothing
+useful. The check also catches a package-name mismatch (which would otherwise fail
+much later, in gradle) and flags the placeholder config.
+
+`npm run firebase:placeholder` writes a structurally valid fake config so the app
+can be built for UI work against emulators with no Firebase account. It refuses to
+overwrite a real config, and prebuild warns whenever it is in use.
+
 ---
 
 ## 10. Current state

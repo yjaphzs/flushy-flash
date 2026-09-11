@@ -7,7 +7,7 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "prebuild": "expo prebuild --clean",
+    "prebuild": "node scripts/check-firebase-config.mjs && expo prebuild --clean",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
@@ -15,7 +15,10 @@
     "doctor": "npx expo-doctor",
     "seed:buildings": "tsx scripts/seed-buildings.ts",
     "test:rules": "npx --yes firebase-tools@15.30.0 emulators:exec --only firestore --project flushy-flash-rules-test \"npm --prefix rules test\"",
-    "typecheck:all": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json && npm --prefix rules run typecheck"
+    "typecheck:all": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json && npm --prefix rules run typecheck",
+    "prebuild:android": "node scripts/check-firebase-config.mjs --platform android && expo prebuild --platform android --clean",
+    "firebase:placeholder": "node scripts/make-placeholder-firebase-config.mjs",
+    "firebase:emulators": "npx --yes firebase-tools@15.30.0 emulators:start"
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.14",

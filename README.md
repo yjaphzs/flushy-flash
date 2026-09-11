@@ -44,7 +44,12 @@ passing is the check that this still holds.
 npm install
 ```
 
-Then supply your own Firebase config — the app will not build without it:
+Then supply a Firebase config — **the app cannot build without one**, because the
+native SDKs read it at prebuild time. It is gitignored (this repo is public), so
+every fresh clone needs it. `npm run prebuild` checks for it and tells you what to
+do rather than failing with a raw ENOENT.
+
+**Option A — real Firebase project.** Needed for anything beyond local UI work.
 
 1. Firebase Console → add an **Android** app with package `dev.g2c.flushyflash`
    → download `google-services.json` → place at the repo root.
@@ -52,6 +57,24 @@ Then supply your own Firebase config — the app will not build without it:
    `GoogleService-Info.plist` → place at the repo root.
 3. Enable **Email/Password** under Authentication → Sign-in method.
 4. Create the Firestore database.
+
+With the Firebase CLI authenticated (`npx firebase-tools login --reauth`) you can
+skip the download:
+
+```bash
+npx firebase-tools apps:sdkconfig android --project <your-project-id> > google-services.json
+```
+
+**Option B — emulators only.** No Firebase account required; good for UI work.
+
+```bash
+npm run firebase:placeholder     # writes a structurally valid fake config
+echo "EXPO_PUBLIC_FIREBASE_USE_EMULATORS=true" >> .env.local
+npm run firebase:emulators       # in a second terminal
+```
+
+The placeholder is recognised on every prebuild and warns you it is in use, so
+you cannot mistake it for a real backend.
 
 Deploy the security rules **before** running the app — they are the actual
 security boundary, not a formality:
