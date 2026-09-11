@@ -271,22 +271,34 @@ async function upload(buildings: SeedBuilding[]) {
     throw new Error(explainAuthFailure(err));
   }
 
+  // Which docs already exist, so a re-run does not clobber fields that must only
+  // ever be written once. One read of ~100 ids is far cheaper than getting this
+  // wrong. restroomCount is maintained elsewhere and createdAt is immutable, so
+  // neither may be included in an update payload.
+  const existing = new Set<string>();
+  const current = await db.collection('buildings').select().get();
+  current.forEach((d) => existing.add(d.id));
+  if (existing.size > 0) {
+    console.log(`  ${existing.size} building(s) already present — reconciling, not duplicating`);
+  }
+
   // Batched, and keyed by a stable slug id, so re-running reconciles rather than
   // duplicating. Firestore caps a batch at 500 writes.
   for (let i = 0; i < buildings.length; i += 400) {
     const batch = db.batch();
     for (const b of buildings.slice(i, i + 400)) {
+      const shared = {
+        name: b.name,
+        code: b.code,
+        aliases: b.aliases,
+        location: new GeoPoint(b.lat, b.lng),
+        osmId: b.osmId,
+      };
       batch.set(
         db.collection('buildings').doc(b.id),
-        {
-          name: b.name,
-          code: b.code,
-          aliases: b.aliases,
-          location: new GeoPoint(b.lat, b.lng),
-          osmId: b.osmId,
-          restroomCount: 0,
-          createdAt: FieldValue.serverTimestamp(),
-        },
+        existing.has(b.id)
+          ? shared
+          : { ...shared, restroomCount: 0, createdAt: FieldValue.serverTimestamp() },
         { merge: true },
       );
     }
