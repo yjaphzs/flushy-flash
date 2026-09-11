@@ -4,6 +4,10 @@ A campus restroom finder for **Central Luzon State University**. Map of campus
 restrooms, student submissions with photos, reviews and ratings, profiles and a
 review feed.
 
+> Working on this with an AI agent? See [AGENTS.md](./AGENTS.md) for the rules and
+> gotchas that are not obvious from the code — several stack choices here look
+> like mistakes and are not.
+
 ## Stack
 
 | Concern | Choice | Note |
@@ -81,6 +85,19 @@ The OSM data is genuinely messy, so the script normalises apostrophes, de-dupes
 by name + proximity, and **flags ambiguities for a human** rather than guessing:
 several colleges (Engineering, Education) are mapped as 2–3 separate wings under
 one name. Review those rows and give them distinct names before uploading.
+
+## Project layout
+
+```
+src/
+  app/              expo-router routes; (auth) and (app) groups gated by Stack.Protected
+  components/       design system — the only UI surface app code imports
+  features/         domain logic: auth, buildings, restrooms, reviews, profile
+  stores/           Zustand state (selector hooks, not Context)
+  hooks/            auth listener, campus data subscriptions, location
+  lib/              campus constants, firebase init, geo maths, shared types
+scripts/            Node tooling (OpenStreetMap building seed); has its own tsconfig
+```
 
 ## Conventions
 
