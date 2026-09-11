@@ -1,0 +1,216 @@
+rules_version = '2';
+
+// Flushy Flash - CLSU campus restroom finder.
+//
+// Design notes that matter when editing this file:
+//  * Aggregates (ratingSum/ratingCount/photoCount) and social counters are NEVER
+//    client-writable. A Cloud Function can take them over later; until then the
+//    app reads live averages via getAggregateFromServer().
+//  * Reviews use a composite id of restroomId + "_" + uid, so "one review per
+//    user per restroom" is enforced structurally - no query, no race.
+//  * hasOnly() locks every document shape. A new field added to the app without
+//    being added here is REJECTED, which is the intended failure direction.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // The verified-student badge is derived from the token itself, never from a
+    // field the client controls. Email must be verified AND on the CLSU domain.
+    function isVerifiedStudent() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.auth.token.email.lower().matches('^[^@]+@clsu[.]edu[.]ph$');
+    }
+
+    function incoming() { return request.resource.data; }
+    function current()  { return resource.data; }
+
+    function unchanged(keys) {
+      return incoming().diff(current()).unchangedKeys().hasAll(keys);
+    }
+
+    function isValidScore(value) {
+      return value is int && value >= 1 && value <= 5;
+    }
+
+    function restroomKeys() {
+      return ['buildingId', 'floor', 'locationNote', 'amenities', 'status',
+              'ratingSum', 'ratingCount', 'photoCount', 'verified',
+              'createdBy', 'createdAt', 'updatedAt'];
+    }
+
+    function reviewKeys() {
+      return ['restroomId', 'buildingId', 'authorId', 'rating', 'cleanliness',
+              'text', 'photoIds', 'createdAt', 'updatedAt'];
+    }
+
+    function userKeys() {
+      return ['handle', 'displayName', 'photoURL', 'verifiedStudent',
+              'reviewCount', 'followerCount', 'followingCount', 'createdAt'];
+    }
+
+    // ---------- buildings ----------
+    // Seeded from OpenStreetMap by an admin script. Students add restrooms, not
+    // buildings, so there is no reason to expose writes here.
+
+    match /buildings/{buildingId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin()
+        && incoming().keys().hasOnly(['name', 'code', 'aliases', 'location',
+                                      'osmId', 'restroomCount', 'createdAt'])
+        && incoming().name is string
+        && incoming().name.size() > 0
+        && incoming().name.size() <= 120
+        && incoming().location is latlng;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- restrooms ----------
+
+    match /restrooms/{restroomId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && incoming().keys().hasOnly(restroomKeys())
+        && incoming().createdBy == request.auth.uid
+        && incoming().buildingId is string
+        && exists(/databases/$(database)/documents/buildings/$(incoming().buildingId))
+        && incoming().floor is int
+        && incoming().floor >= -5 && incoming().floor <= 50
+        && incoming().locationNote is string
+        && incoming().locationNote.size() <= 200
+        && incoming().status in ['ok', 'out_of_order', 'closed']
+        && incoming().ratingSum == 0
+        && incoming().ratingCount == 0
+        && incoming().photoCount == 0
+        && incoming().verified == false;
+
+      allow update: if isSignedIn()
+        && (isSelf(current().createdBy) || isVerifiedStudent() || isAdmin())
+        && unchanged(['ratingSum', 'ratingCount', 'photoCount', 'createdBy', 'createdAt'])
+        && incoming().keys().hasOnly(restroomKeys())
+        && incoming().status in ['ok', 'out_of_order', 'closed']
+        && incoming().locationNote is string
+        && incoming().locationNote.size() <= 200
+        && (unchanged(['verified']) || isVerifiedStudent() || isAdmin());
+
+      // Narrow on purpose: only the author, and only before anyone else has
+      // invested a review or a photo in the entry.
+      allow delete: if isAdmin()
+        || (isSelf(current().createdBy)
+            && current().ratingCount == 0
+            && current().photoCount == 0);
+    }
+
+    // ---------- reviews ----------
+    // Document id MUST be restroomId + "_" + uid.
+
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && reviewId == incoming().restroomId + '_' + request.auth.uid
+        && incoming().authorId == request.auth.uid
+        && incoming().keys().hasOnly(reviewKeys())
+        && isValidScore(incoming().rating)
+        && isValidScore(incoming().cleanliness)
+        && incoming().text is string
+        && incoming().text.size() <= 2000
+        && incoming().photoIds is list
+        && incoming().photoIds.size() <= 6
+        && exists(/databases/$(database)/documents/restrooms/$(incoming().restroomId));
+
+      allow update: if isSelf(current().authorId)
+        && unchanged(['restroomId', 'buildingId', 'authorId', 'createdAt'])
+        && incoming().keys().hasOnly(reviewKeys())
+        && isValidScore(incoming().rating)
+        && isValidScore(incoming().cleanliness)
+        && incoming().text is string
+        && incoming().text.size() <= 2000;
+
+      allow delete: if isSelf(current().authorId) || isAdmin();
+    }
+
+    // ---------- users ----------
+
+    match /users/{uid} {
+      allow read: if isSignedIn();
+
+      allow create: if isSelf(uid)
+        && incoming().keys().hasOnly(userKeys())
+        && incoming().handle is string
+        && incoming().handle.matches('^[a-z0-9_]{3,20}$')
+        && incoming().displayName is string
+        && incoming().displayName.size() > 0
+        && incoming().displayName.size() <= 60
+        && incoming().reviewCount == 0
+        && incoming().followerCount == 0
+        && incoming().followingCount == 0
+        && incoming().verifiedStudent == isVerifiedStudent();
+
+      allow update: if isSelf(uid)
+        && unchanged(['handle', 'createdAt'])
+        && unchanged(['reviewCount', 'followerCount', 'followingCount'])
+        && incoming().keys().hasOnly(userKeys())
+        && incoming().displayName is string
+        && incoming().displayName.size() > 0
+        && incoming().displayName.size() <= 60
+        && incoming().verifiedStudent == isVerifiedStudent();
+
+      allow delete: if isAdmin();
+
+      // PII lives here and is never publicly readable, unlike the profile above.
+      match /private/{docId} {
+        allow read, write: if isSelf(uid);
+      }
+    }
+
+    // ---------- handles ----------
+    // Uniqueness lock, created in the same batch as the profile. Never updated.
+
+    match /handles/{handle} {
+      // Readable while signed out so sign-up can check availability first.
+      allow read: if true;
+      allow create: if isSignedIn()
+        && incoming().keys().hasOnly(['uid', 'createdAt'])
+        && incoming().uid == request.auth.uid
+        && handle.matches('^[a-z0-9_]{3,20}$');
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- follows ----------
+
+    match /follows/{followId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && followId == request.auth.uid + '_' + incoming().followeeId
+        && incoming().keys().hasOnly(['followerId', 'followeeId', 'createdAt'])
+        && incoming().followerId == request.auth.uid
+        && incoming().followeeId is string
+        && incoming().followeeId != request.auth.uid;
+      allow update: if false;
+      allow delete: if isSelf(current().followerId) || isAdmin();
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

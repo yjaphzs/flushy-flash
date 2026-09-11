@@ -1,0 +1,29 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "live": {
+      "$restroomId": {
+        ".read": "auth != null",
+
+        "status": {
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['status', 'reportedBy', 'reportedAt'])",
+          "status": { ".validate": "newData.isString() && newData.val().matches(/^(ok|out_of_order|closed)$/)" },
+          "note": { ".validate": "newData.isString() && newData.val().length <= 140" },
+          "reportedBy": { ".validate": "newData.val() === auth.uid" },
+          "reportedAt": { ".validate": "newData.val() <= now" },
+          "$other": { ".validate": false }
+        },
+
+        "viewers": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid",
+            ".validate": "newData.isNumber() && newData.val() <= now"
+          }
+        }
+      }
+    }
+  }
+}

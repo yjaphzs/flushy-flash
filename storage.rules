@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// Photo storage for Flushy Flash.
+//
+// Note: a Storage download URL, once issued, bypasses these rules entirely. All
+// imagery here is effectively public to anyone holding a link. That is acceptable
+// for restroom and avatar photos - do not reuse this bucket for anything else.
+//
+// contentType is client-asserted and can be spoofed. Before launch, add a
+// Storage-triggered function that checks magic bytes and deletes non-images.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    function withinSizeLimit() {
+      return request.resource.size < 8 * 1024 * 1024;
+    }
+
+    // Uploader is recorded in metadata so a moderator can attribute an image
+    // without reading Firestore.
+    function declaresUploader() {
+      return request.resource.metadata.uploadedBy == request.auth.uid;
+    }
+
+    match /restrooms/{restroomId}/{photoId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isImage() && withinSizeLimit() && declaresUploader();
+      // Photos are immutable: replacing bytes behind an existing URL would let
+      // someone swap approved content for something else after the fact.
+      allow update: if false;
+      allow delete: if isSignedIn()
+        && resource.metadata.uploadedBy == request.auth.uid;
+    }
+
+    match /users/{uid}/avatar/{avatarId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && isImage()
+        && request.resource.size < 2 * 1024 * 1024
+        && declaresUploader();
+      allow update: if false;
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

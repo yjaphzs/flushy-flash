@@ -1,0 +1,9 @@
+/* Tailwind v4 is CSS-first — there is deliberately no tailwind.config.js.
+   Order matters: tailwind, then uniwind's native variants, then HeroUI's styles. */
+@import 'tailwindcss';
+@import 'uniwind';
+@import 'heroui-native/styles';
+
+/* Tailwind's @source is resolved relative to THIS file, hence the `../`.
+   Without it HeroUI's own classes get purged and its components render unstyled. */
+@source '../node_modules/heroui-native/lib';
