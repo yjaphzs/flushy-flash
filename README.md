@@ -51,7 +51,7 @@ do rather than failing with a raw ENOENT.
 
 **Option A — real Firebase project.** Needed for anything beyond local UI work.
 
-1. Firebase Console → add an **Android** app with package `dev.g2c.flushyflash`
+1. Firebase Console → add an **Android** app with package `xyz.yjaphzs.flushyflash`
    → download `google-services.json` → place at the repo root.
 2. Add an **iOS** app with the same bundle id → download
    `GoogleService-Info.plist` → place at the repo root.

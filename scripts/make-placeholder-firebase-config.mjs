@@ -53,7 +53,7 @@ const placeholder = {
     {
       client_info: {
         mobilesdk_app_id: '1:000000000000:android:0000000000000000000000',
-        android_client_info: { package_name: 'dev.g2c.flushyflash' },
+        android_client_info: { package_name: 'xyz.yjaphzs.flushyflash' },
       },
       oauth_client: [],
       api_key: [{ current_key: 'AIzaSyPlaceholderPlaceholderPlaceholder00' }],

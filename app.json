@@ -8,7 +8,7 @@
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/icon.png",
     "ios": {
-      "bundleIdentifier": "dev.g2c.flushyflash",
+      "bundleIdentifier": "xyz.yjaphzs.flushyflash",
       "supportsTablet": false,
       "deploymentTarget": "16.0",
       "googleServicesFile": "./GoogleService-Info.plist",
@@ -17,7 +17,7 @@
       }
     },
     "android": {
-      "package": "dev.g2c.flushyflash",
+      "package": "xyz.yjaphzs.flushyflash",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundImage": "./assets/images/android-icon-background.png",

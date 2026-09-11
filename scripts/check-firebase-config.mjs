@@ -31,12 +31,24 @@ if (missing.length === 0) {
   if (needsAndroid) {
     try {
       const parsed = JSON.parse(readFileSync(ANDROID, 'utf8'));
-      const pkg = parsed?.client?.[0]?.client_info?.android_client_info?.package_name;
-      if (pkg && pkg !== 'dev.g2c.flushyflash') {
+
+      // Read the expected package from app.json rather than hardcoding it, so a
+      // rename can never leave this check silently out of date.
+      const appJson = JSON.parse(readFileSync(resolve(ROOT, 'app.json'), 'utf8'));
+      const expected = appJson?.expo?.android?.package;
+
+      // A google-services.json legitimately holds one client per registered app,
+      // so check whether ANY of them matches — not just the first.
+      const packages = (parsed?.client ?? [])
+        .map((c) => c?.client_info?.android_client_info?.package_name)
+        .filter(Boolean);
+
+      if (expected && packages.length > 0 && !packages.includes(expected)) {
         console.error(
-          `\n  google-services.json is for package "${pkg}", but this app is ` +
-            `"dev.g2c.flushyflash".\n  The Android build will fail. Re-download it from the ` +
-            `correct Firebase app.\n`,
+          `\n  google-services.json has no client for "${expected}".\n` +
+            `  It contains: ${packages.join(', ')}\n\n` +
+            `  The Android build will fail. Register that package in Firebase and\n` +
+            `  re-download the config.\n`,
         );
         process.exit(1);
       }
@@ -66,7 +78,7 @@ console.error(`
 
   A) Real Firebase project — needed for anything beyond local development
        1. https://console.firebase.google.com -> your project -> Project settings
-       2. Add an Android app with package name exactly:  dev.g2c.flushyflash
+       2. Add an Android app with package name exactly:  xyz.yjaphzs.flushyflash
        3. Download google-services.json to the repo root
        4. Enable Email/Password under Authentication -> Sign-in method
 
