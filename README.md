@@ -117,16 +117,35 @@ no mapped restrooms. So buildings are seeded automatically and restrooms are
 crowd-sourced.
 
 ```bash
-npm run seed:buildings                              # fetch → scripts/buildings.seed.csv
-# review the CSV (see warnings it prints), then:
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
-  npx tsx scripts/seed-buildings.ts --upload
+npm run seed:buildings                     # fetch → scripts/buildings.seed.csv
+# review the CSV (see the warnings it prints), then authenticate and upload:
+gcloud auth application-default login
+npx tsx scripts/seed-buildings.ts --upload
 ```
 
 The OSM data is genuinely messy, so the script normalises apostrophes, de-dupes
 by name + proximity, and **flags ambiguities for a human** rather than guessing:
 several colleges (Engineering, Education) are mapped as 2–3 separate wings under
 one name. Review those rows and give them distinct names before uploading.
+
+### Why the upload needs admin credentials
+
+`google-services.json` cannot do this, and the reason is worth understanding —
+the two credentials are opposites:
+
+| | `google-services.json` | service account / ADC |
+|---|---|---|
+| Kind | **Client** config | **Admin** credential |
+| Privileges | None — every action gated by `firestore.rules` | **Bypasses rules entirely** |
+| Exposure | Ships inside every APK, extractable | A genuine secret |
+
+The seed needs admin because `firestore.rules` makes `buildings` **admin-write-only**
+— students add restrooms, not buildings — so no client credential can write them.
+
+`gcloud auth application-default login` is preferred: it leaves no downloadable
+key. A service-account key (`GOOGLE_APPLICATION_CREDENTIALS=./service-account.json`)
+also works and is what unattended CI would use, but it is a long-lived secret with
+full project access. It is gitignored; keep it that way.
 
 ## Project layout
 
