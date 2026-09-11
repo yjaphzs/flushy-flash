@@ -1,0 +1,35 @@
+{
+  "name": "flushy-flash-rules-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Security-rules test suite. Deliberately isolated from the app's dependency tree: @react-native-firebase and the Firebase JS SDK each pull in their own @firebase/app-compat, and the duplicate copies break rules-unit-testing's compat layer. Keeping these deps here also stops the JS SDK ever being importable from app code.",
+  "scripts": {
+    "test": "jest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.2",
+    "@types/jest": "29.5.14",
+    "@types/node": "24.10.1",
+    "firebase": "12.19.0",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.12",
+    "typescript": "6.0.3"
+  },
+  "jest": {
+    "displayName": "rules",
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "<rootDir>/tsconfig.json"
+        }
+      ]
+    },
+    "testTimeout": 20000
+  }
+}

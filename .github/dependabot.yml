@@ -1,0 +1,64 @@
+version: 2
+
+# ⚠️ A default Dependabot config would actively fight this project.
+#
+# Versions here deliberately track Expo SDK 57's pins rather than npm latest,
+# because expo-modules-core is compiled against the SDK's headers (AGENTS.md §5).
+# Left unconstrained, Dependabot would raise PRs bumping React Native, React,
+# Reanimated and worklets past those pins — each one failing `npx expo-doctor`
+# and, worse, sometimes passing CI while breaking the native build.
+#
+# SDK-owned packages move only via `npx expo install --fix` during an SDK upgrade.
+updates:
+  # GitHub Actions: always safe to keep current, and the workflows pin major
+  # versions that need periodic bumping.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(ci)'
+    labels: [chore, dependencies]
+
+  # App dependencies: only the ones the Expo SDK does not own.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+    labels: [chore, dependencies]
+    ignore:
+      # ── Owned by the Expo SDK: bump only via expo-upgrade ──
+      - dependency-name: expo
+      - dependency-name: expo-*
+      - dependency-name: '@expo/*'
+      - dependency-name: react
+      - dependency-name: react-dom
+      - dependency-name: react-native
+      - dependency-name: react-native-*
+      - dependency-name: '@react-native/*'
+      - dependency-name: '@types/react'
+      - dependency-name: typescript
+      - dependency-name: jest
+      - dependency-name: jest-expo
+      - dependency-name: '@types/jest'
+      - dependency-name: eslint-config-expo
+      # ── Native modules: a bump means a new native build, not a lockfile edit ──
+      - dependency-name: '@react-native-firebase/*'
+      - dependency-name: '@maplibre/maplibre-react-native'
+      # ── HeroUI and its styling engine move together; upgrade deliberately ──
+      - dependency-name: heroui-native
+      - dependency-name: uniwind
+      - dependency-name: tailwindcss
+
+  # The rules test suite is isolated from the app tree, so it can move freely.
+  - package-ecosystem: npm
+    directory: /rules
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: 'chore(rules)'
+    labels: [chore, dependencies]

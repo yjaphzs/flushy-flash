@@ -1,0 +1,16 @@
+# Groups GitHub's auto-generated release notes. Categories are matched by PR
+# label, so labelling a PR is what puts it in the right section of the changelog.
+changelog:
+  exclude:
+    labels: [ignore-for-release]
+  categories:
+    - title: ✨ Features
+      labels: [feature, enhancement]
+    - title: 🐛 Fixes
+      labels: [fix, bug]
+    - title: 🔒 Security & rules
+      labels: [security, rules]
+    - title: 🧰 Maintenance
+      labels: [chore, dependencies, ci, docs]
+    - title: Other changes
+      labels: ['*']

@@ -195,7 +195,15 @@ npx tsc --noEmit -p scripts/tsconfig.json  # node scripts (separate config)
 npm run lint                               # includes the import firewall
 npm test
 npx expo-doctor                            # expect 21/21
+
+npm run test:rules                         # security rules — needs Java; emulator on :8181
 ```
+
+`rules/` is an **isolated npm package** with its own `node_modules`. That is not
+tidiness: `@react-native-firebase` and the Firebase JS SDK each pull in their own
+`@firebase/app-compat`, and the duplicate copies break rules-unit-testing's compat
+layer with `getApp(...).firestore is not a function`. Keeping them apart also
+stops the JS SDK ever becoming importable from app code.
 
 For anything touching styling, also bundle it — Uniwind failures show up as
 unstyled components, not errors:
@@ -215,6 +223,70 @@ needs a fresh `npx expo prebuild --clean` and a rebuild.
 
 ---
 
+## 10. CI, branching and releases
+
+**Branching is GitHub Flow.** `main` is protected — PRs only, CI must pass. Branch
+prefixes: `feat/`, `fix/`, `chore/`. Never commit directly to `main`; never
+force-push a shared branch. Releases come from **tags**, not a release branch.
+
+**Workflows** (`.github/workflows/`):
+
+| Workflow | Trigger | Does |
+|---|---|---|
+| `ci.yml` | every PR + push to main | The §9 block: typecheck (app + scripts), lint, test, expo-doctor |
+| `firebase-rules.yml` | rules/ or `*.rules` change | Runs the attack matrix against the emulator; deploys on main after it passes |
+| `native-check.yml` | `app.json`/`package.json`/`plugins/` change | `expo prebuild` + `assembleDebug` — catches native breakage typecheck cannot see |
+| `release.yml` | `v*` tag | Signed APK → GitHub Release with auto-generated notes |
+
+**PR titles become the changelog.** GitHub generates release notes from merged PR
+titles, grouped by label via `.github/release.yml`. Write them for a reader who
+was not involved.
+
+**Cutting a release:** bump `package.json` and `app.json` version, commit, tag
+`vX.Y.Z`, push with `--tags`. The workflow sets `versionCode` from the run number
+(monotonic, which Android requires for in-place upgrades) — do not set it by hand.
+
+**Android release signing lives in a config plugin**, `plugins/with-release-signing.js`,
+not in a patched `android/`. Expo's bare template points `buildTypes.release` at
+`signingConfigs.debug`, so a release build is debug-signed out of the box — which
+would strand every installed user on the next update. The plugin is a no-op unless
+`ANDROID_KEYSTORE_PATH` is set, so local debug builds need no secrets. The release
+workflow asserts with `apksigner` that the output is not debug-signed.
+
+**Dependabot is deliberately constrained** (`.github/dependabot.yml`). Left
+unconstrained it would bump React Native, React, Reanimated and worklets past the
+SDK pins, breaking §5 and failing `expo-doctor`. SDK-owned packages, native
+modules, and the HeroUI/Uniwind/Tailwind trio are all on its ignore list — those
+move only via a deliberate `expo-upgrade`.
+
+---
+
+## 11. Environment configuration
+
+`src/lib/env.ts` is the single typed entry point; `.env.example` documents every
+variable. Only `EXPO_PUBLIC_*` is inlined into the bundle, at build time — it is
+readable inside the shipped APK, so nothing secret goes there.
+
+**There is deliberately no `EXPO_PUBLIC_FIREBASE_API_KEY` / `PROJECT_ID` / `APP_ID`.**
+The native SDKs read project config from `google-services.json` /
+`GoogleService-Info.plist` at prebuild; there is no `initializeApp({ apiKey })`
+call in this codebase. Adding those vars would create config that looks meaningful
+and does nothing. **Do not add them** — that pattern belongs to the Firebase JS
+SDK, which this project does not use. To point at a different Firebase project,
+swap those two files and re-run `npx expo prebuild --clean`.
+
+What *is* env-driven: emulator routing
+(`EXPO_PUBLIC_FIREBASE_USE_EMULATORS`, `..._EMULATOR_HOST`, per-service ports) and
+`EXPO_PUBLIC_MAP_STYLE_URL`. Emulator host defaults are per-platform — the Android
+emulator reaches the host at `10.0.2.2`, not `localhost`; a physical device needs
+your LAN IP.
+
+`google-services.json` is **gitignored** — the repo is public, and published API
+keys get scraped for signup spam and quota burn. CI reads it from the
+`GOOGLE_SERVICES_JSON` secret.
+
+---
+
 ## 10. Current state
 
 Working: auth (sign up/in/out, reset, verified-student badge), campus map with
@@ -226,5 +298,10 @@ Stubbed — safe places to pick up: the review composer
 (`src/app/(app)/(tabs)/feed.tsx`). The follow graph and fan-out-on-read query are
 designed (§7, README) but not built.
 
-Not yet done: photo upload to Storage, RTDB live status, and the emulator test
-suite for the rules.
+Not yet done: photo upload to Storage and RTDB live status.
+
+The rules attack matrix now exists and passes (37 cases, `rules/firestore.test.ts`),
+so §7's "written but unproven" caveat is closed. It earned its keep immediately by
+catching a real bug: `isAdmin()` read `request.auth.token.admin` directly, which
+**raises an evaluation error** rather than returning false when the claim is
+absent — it denied, so tests expecting denial had masked it.

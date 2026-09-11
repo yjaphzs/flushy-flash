@@ -1,5 +1,8 @@
 # Flushy Flash
 
+[![ci](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml)
+[![firebase-rules](https://github.com/yjaphzs/flushy-flash/actions/workflows/firebase-rules.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/firebase-rules.yml)
+
 A campus restroom finder for **Central Luzon State University**. Map of campus
 restrooms, student submissions with photos, reviews and ratings, profiles and a
 review feed.
@@ -128,6 +131,54 @@ memory, so filtering and "nearest" sorting are array operations
 than estimated — including why the default camera is the administrative core and
 not the geometric centroid (which sits in CLSU's farmland).
 
+## Install the app
+
+Grab the APK from [Releases](https://github.com/yjaphzs/flushy-flash/releases) and
+open it on your Android phone. You will need to allow installs from unknown
+sources the first time. Requires Android 7.0 or newer.
+
+## Environment
+
+Copy `.env.example` to `.env.local`. Every value has a working default, so the app
+runs with no `.env` file at all.
+
+Note there is deliberately **no `EXPO_PUBLIC_FIREBASE_API_KEY`**. This app uses the
+native Firebase SDKs, which read project config from `google-services.json` /
+`GoogleService-Info.plist` at prebuild — there is no `initializeApp({ apiKey })`
+call, so such a variable would do nothing. To use a different Firebase project,
+swap those files and re-run `npx expo prebuild --clean`.
+
+What *is* configurable: emulator routing and the map tile URL. To run against
+local emulators, set `EXPO_PUBLIC_FIREBASE_USE_EMULATORS=true` — and note the
+Android emulator reaches your machine at `10.0.2.2`, not `localhost`, while a
+physical device needs your LAN IP in `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST`.
+
+## CI and releases
+
+`main` is protected; work happens on `feat/`, `fix/` and `chore/` branches and
+merges via PR. **PR titles become the release notes**, so write them for someone
+who was not involved.
+
+| Workflow | Trigger |
+|---|---|
+| `ci` | every PR — typecheck, lint, test, expo-doctor |
+| `firebase-rules` | rules changes — runs the attack matrix, deploys on main |
+| `native-check` | native config changes — prebuild + assembleDebug |
+| `release` | a `v*` tag — signed APK attached to a GitHub Release |
+
+Cutting a release:
+
+```bash
+npm version minor --no-git-tag-version   # then match expo.version in app.json
+git commit -am "chore: release v1.1.0"
+git tag v1.1.0 && git push origin main --tags
+```
+
+Release builds need these repo secrets: `GOOGLE_SERVICES_JSON`,
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+`ANDROID_KEY_PASSWORD`. Generate the keystore once and **back it up offline** —
+losing it means installed apps can never be updated again.
+
 ## Verify
 
 ```bash
@@ -136,6 +187,7 @@ npx tsc --noEmit -p scripts/tsconfig.json  # node scripts
 npm run lint
 npm test
 npx expo-doctor
+npm run test:rules                         # security rules (needs Java)
 ```
 
 ## Status

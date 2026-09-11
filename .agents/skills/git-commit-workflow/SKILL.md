@@ -1,0 +1,275 @@
+---
+created: 2025-12-16
+modified: 2026-05-14
+reviewed: 2026-05-14
+name: git-commit-workflow
+description: "Conventional commit format, staging, and message conventions. Use when writing commit messages, staging files, grouping changes, or auto-detecting linked issues."
+user-invocable: false
+allowed-tools: Bash, Read
+---
+
+# Git Commit Workflow
+
+## When to Use This Skill
+
+| Use this skill when... | Use the alternative when... |
+|---|---|
+| Designing the conventional-commit message and staging conventions for a repo | Use `git-commit` to actually create a commit (handles pre-commit hooks, issue detection) |
+| Reviewing how to group changes logically into focused commits | Use `git-commit-trailers` for `BREAKING CHANGE` / `Co-authored-by` trailer rules |
+| Discussing humble, fact-based commit communication style | Use `github-issue-autodetect` to add `Fixes #N` / `Closes #N` links to messages |
+| Authoring `feat(scope): subject` rules for your codebase | Use `github-pr-title` to apply the same conventional format to PR titles |
+
+Expert guidance for commit message conventions, staging practices, and commit best practices using conventional commits and explicit staging workflows.
+
+For detailed examples, advanced patterns, and best practices, see [REFERENCE.md](REFERENCE.md).
+
+## Preconditions
+
+Before staging any files — especially for bulk-edit / commit-loop workflows that touch many subdirectories — verify the working tree is yours alone:
+
+| Check | Why | How |
+|-------|-----|-----|
+| Coworker check | Another Claude session in the same checkout may have already pre-staged files (`git commit -a` retry, abandoned staging) that your loop would sweep into the wrong commit. **Run this up front, not opportunistically.** | `SlashCommand` → `/git:coworker-check` |
+| Working tree scoped | Confirm `git status --porcelain` shows only your edits | `git status --porcelain` |
+
+If `/git:coworker-check` returns anything other than `clear`, stop and either move to a fresh worktree (`git worktree add ../<repo>-<task>`) or ask the user before proceeding. See `.claude/rules/agent-coworker-detection.md` for the four detection signals.
+
+## Core Expertise
+
+- **Conventional Commits**: Standardized format for automation and clarity
+- **Explicit Staging**: Always stage files individually with clear visibility
+- **Logical Grouping**: Group related changes into focused commits
+- **Communication Style**: Humble, factual, concise commit messages
+- **Pre-commit Integration**: Run checks before committing
+
+**Note:** Commits are made on main branch and pushed to remote feature branches for PRs. See **git-branch-pr-workflow** skill for the main-branch development pattern.
+
+## Conventional Commit Format
+
+### Standard Format
+
+```
+type(scope): description
+
+[optional body]
+
+[optional footer(s)]
+```
+
+For footer/trailer patterns (Co-authored-by, BREAKING CHANGE, Release-As), see **git-commit-trailers** skill.
+
+### Commit Types
+
+- **feat**: New feature for the user
+- **fix**: Bug fix for the user
+- **docs**: Documentation changes
+- **style**: Formatting, missing semicolons, etc (no code change)
+- **refactor**: Code restructuring without changing behavior
+- **test**: Adding or updating tests
+- **chore**: Maintenance tasks, dependency updates, linter fixes
+- **perf**: Performance improvements
+- **ci**: CI/CD changes
+
+### Examples
+
+```bash
+# Feature with scope
+git commit -m "feat(auth): implement OAuth2 integration"
+
+# Bug fix with body
+git commit -m "fix(api): resolve null pointer in user service
+
+Fixed race condition where user object could be null during
+concurrent authentication requests."
+
+# Breaking change
+git commit -m "feat(api)!: migrate to GraphQL endpoints
+
+BREAKING CHANGE: REST endpoints removed in favor of GraphQL.
+See migration guide at docs/migration.md"
+```
+
+### Commit Message Best Practices
+
+**DO:**
+- Use imperative mood ("add feature" not "added feature")
+- Keep first line under 72 characters
+- Be concise and factual
+- **ALWAYS reference related issues** - every commit should link to relevant issues
+- Use GitHub closing keywords: `Fixes #123`, `Closes #456`, `Resolves #789`
+- Use `Refs #N` for related issues that should not auto-close
+- Use lowercase for type and scope
+- Be humble and modest
+
+**DON'T:**
+- Use past tense ("added" or "fixed")
+- Include unnecessary details in subject line
+- Use vague descriptions ("update stuff", "fix bug")
+- Omit issue references - always link commits to their context
+- Use closing keywords (`Fixes`) when you only mean to reference (`Refs`)
+
+## Pre-Commit Context Gathering (Recommended)
+
+Before committing, gather all context in one command:
+
+```bash
+# Basic context: status, staged files, diff stats, recent log
+bash "${CLAUDE_PLUGIN_ROOT}/skills/git-commit-workflow/scripts/commit-context.sh"
+
+# With issue matching: also fetches open GitHub issues for auto-linking
+bash "${CLAUDE_PLUGIN_ROOT}/skills/git-commit-workflow/scripts/commit-context.sh" --with-issues
+```
+
+The script outputs: branch info, staged/unstaged status, diff stats, detected scopes, recent commit style, pre-commit config status, and optionally open issues. Use this output to compose the commit message. See [scripts/commit-context.sh](scripts/commit-context.sh) for details.
+
+## Explicit Staging Workflow
+
+### Always Stage Files Individually
+
+```bash
+# Show current status
+git status --porcelain
+
+# Stage files one by one for visibility
+git add src/auth/login.ts
+git add src/auth/oauth.ts
+git status  # Verify what's staged
+
+# Show what will be committed
+git diff --cached --stat
+git diff --cached  # Review actual changes
+
+# Commit with conventional message
+git commit -m "feat(auth): add OAuth2 support"
+```
+
+## Bulk-edit / per-plugin commit loops
+
+When a single change touches many subdirectories (per-plugin, per-package, per-doc) and each needs its own scoped commit for release-please, write a one-shot script rather than chaining commands inline.
+
+### Why inline loops fail
+
+| Pattern | What blocks it |
+|---------|----------------|
+| `for d in a b c; do git add "$d/" && git commit -m "..."; done` | `bash-antipatterns.sh` blocks `git add ... && git commit ...` — chaining index-modifying git commands risks an `index.lock` race condition |
+| `git add -A`, `git add --all`, `git add .` | `bash-antipatterns.sh` blocks broad staging — sweeps in `.env`, large binaries, and **any coworker session's in-flight files** in a shared checkout (see `.claude/rules/agent-coworker-detection.md`) |
+| Repeating `git add <paths>; git commit -m "..."` as separate Bash tool calls per plugin | Works, but ~3 tool calls × N plugins becomes hundreds of round-trips for a 40-plugin sweep |
+
+### Canonical recipe
+
+Write the loop to `/tmp/commit-loop-<slug>.sh`, then run it in **one** Bash call. The hook treats the file as a script, not a chain — index-modifying commands are sequential within bash, not racing through separate tool invocations.
+
+```bash
+#!/bin/bash
+# /tmp/commit-loop-trim-descriptions.sh
+set -uo pipefail
+cd "$REPO_ROOT" || exit 1
+
+for p in plugin-a plugin-b plugin-c; do
+  # Skip plugins with nothing staged or modified inside them
+  [ -z "$(git status --porcelain "$p/")" ] && continue
+
+  git add "$p/skills/"            # explicit path, never -A or .
+  git commit -m "docs($p): trim skill descriptions for listing budget"
+done
+```
+
+Invoke once:
+
+```bash
+bash /tmp/commit-loop-trim-descriptions.sh
+```
+
+Each iteration runs pre-commit hooks and produces a clean per-plugin commit. Use `;` or newlines (not `&&`) between `git add` and `git commit` inside the script.
+
+### Failure recovery
+
+If the loop aborts mid-way (a pre-commit hook fails on plugin K of N), the commits for plugins 1..K-1 have **already landed** — they are not rolled back. Recovery rules:
+
+| Situation | Action |
+|-----------|--------|
+| Pre-commit hook caught a real issue in plugin K | Fix the issue, re-run the script — the `[ -z ... ] && continue` guard skips plugins with no remaining changes |
+| Script re-run picks up plugin K's leftover staged paths | Good — the unstaged-or-staged check via `git status --porcelain "$p/"` catches both |
+| You want to skip plugin K and continue | Edit the script to remove plugin K from the list, re-run |
+
+Do **not** re-stage paths that already committed cleanly; `git status` is the source of truth for what's left.
+
+**Compose a multi-line message with a HEREDOC, not by slurping a temp file.**
+
+```bash
+git commit -m "$(cat <<'EOF'
+feat(auth): add OAuth2 support
+
+Implements token refresh and secure storage.
+
+Fixes #123
+EOF
+)"
+```
+
+Passing the message **by path** is equally accepted — `git commit -F <file>` /
+`--file=<file>` is git's analogue of `gh --body-file`, and the
+`bash-antipatterns` hook exempts it (#2462):
+
+```bash
+git commit -F /tmp/commit-msg.txt
+```
+
+What the hook still nudges away from is the roundabout middle ground: writing a
+temp file and then slurping it back through `-m "$(cat /tmp/commit-msg.txt)"`.
+Either compose inline with a heredoc, or pass the file by path.
+
+## Communication Style
+
+### Humble, Fact-Based Messages
+
+```bash
+# Good: Concise, factual, modest
+git commit -m "fix(auth): handle edge case in token refresh"
+
+git commit -m "feat(api): add pagination support
+
+Implements cursor-based pagination for list endpoints.
+Includes tests and documentation."
+```
+
+Focus on facts: **What changed**, **Why it changed** (if non-obvious), and **Impact** (breaking changes).
+
+## Issue Reference Summary
+
+| Scenario | Pattern | Example |
+|----------|---------|---------|
+| Bug fix resolving issue | `Fixes #N` | `Fixes #123` |
+| Feature completing issue | `Closes #N` | `Closes #456` |
+| Related but not completing | `Refs #N` | `Refs #789` |
+| Cross-repository | `Fixes owner/repo#N` | `Fixes org/lib#42` |
+| Multiple issues | Repeat keyword | `Fixes #1, fixes #2` |
+
+## Best Practices
+
+### Commit Frequency
+
+- **Commit early and often**: Small, focused commits
+- **One logical change per commit**: Easier to review and revert
+- **Keep commits atomic**: Each commit should be a complete, working state
+
+### Commit Message Length
+
+```bash
+# Subject line: <= 72 characters
+feat(auth): add OAuth2 support
+
+# Body: <= 72 characters per line (wrap)
+# Use blank line between subject and body
+```
+
+## Agentic Optimizations
+
+| Context | Command |
+|---------|---------|
+| Pre-commit context | `bash "${CLAUDE_PLUGIN_ROOT}/skills/git-commit-workflow/scripts/commit-context.sh"` |
+| Context + issues | `bash "${CLAUDE_PLUGIN_ROOT}/skills/git-commit-workflow/scripts/commit-context.sh" --with-issues` |
+| Quick status | `git status --porcelain` |
+| Staged diff stats | `git diff --cached --stat` |
+| Recent commit style | `git log --format='%s' -5` |
+| Open issues for linking | `gh issue list --state open --json number,title --limit 30` |

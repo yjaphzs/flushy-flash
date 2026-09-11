@@ -31,6 +31,12 @@
       "skillPath": "plugins/expo/skills/expo-upgrade/SKILL.md",
       "computedHash": "cf2948a0d0023758a9faad2b47e5e0c6d0aaabf4d1335fc36d9925d75848f4c9"
     },
+    "git-commit-workflow": {
+      "source": "laurigates/claude-plugins",
+      "sourceType": "github",
+      "skillPath": "git-plugin/skills/git-commit-workflow/SKILL.md",
+      "computedHash": "3a4a611223ce1957974e0658428b7359c474ef82bb1a65bf612d8d9442182dfe"
+    },
     "heroui-native": {
       "source": "heroui-inc/heroui",
       "sourceType": "github",

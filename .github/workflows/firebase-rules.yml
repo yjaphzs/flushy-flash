@@ -1,0 +1,92 @@
+name: firebase-rules
+
+# The security rules are the app's actual boundary — everything else is a
+# convenience. This suite is adversarial: each case is an attack that must be
+# denied. It already caught a real bug (isAdmin() raised an evaluation error
+# instead of returning false when the admin claim was absent).
+on:
+  pull_request:
+    paths:
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'database.rules.json'
+      - 'firestore.indexes.json'
+      - 'rules/**'
+      - '.github/workflows/firebase-rules.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'storage.rules'
+      - 'database.rules.json'
+      - 'firestore.indexes.json'
+      - 'rules/**'
+  workflow_dispatch:
+
+concurrency:
+  group: firebase-rules-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Attack matrix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # The Firestore emulator is a Java process.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # rules/ is an isolated package: @react-native-firebase and the Firebase JS
+      # SDK each pull their own @firebase/app-compat, and the duplicate copies
+      # break rules-unit-testing's compat layer. Keeping them apart also stops the
+      # JS SDK ever being importable from app code.
+      - name: Install rules test deps
+        working-directory: rules
+        run: npm ci
+
+      - name: Typecheck rules tests
+        working-directory: rules
+        run: npm run typecheck
+
+      - name: Run attack matrix against the emulator
+        run: npm run test:rules
+
+  deploy:
+    name: Deploy rules
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # Deploys only after the attack matrix passes. Rules that have not been
+      # tested should never reach the real project.
+      - name: Deploy to Firebase
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_PROJECT: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ] || [ -z "$FIREBASE_PROJECT" ]; then
+            echo "::error::FIREBASE_TOKEN and FIREBASE_PROJECT_ID secrets are required to deploy rules."
+            exit 1
+          fi
+          npx --yes firebase-tools@15.30.0 deploy \
+            --project "$FIREBASE_PROJECT" \
+            --only firestore:rules,firestore:indexes,storage,database \
+            --non-interactive

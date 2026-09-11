@@ -76,7 +76,8 @@
             "targetSdkVersion": 36
           }
         }
-      ]
+      ],
+      "./plugins/with-release-signing"
     ],
     "experiments": {
       "typedRoutes": true,

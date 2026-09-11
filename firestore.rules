@@ -25,7 +25,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.admin == true;
+      // .get() with a default, not .admin: reading a claim that is absent is an
+      // evaluation error in rules, not false. Most users have no admin claim.
+      return isSignedIn() && request.auth.token.get('admin', false) == true;
     }
 
     // The verified-student badge is derived from the token itself, never from a

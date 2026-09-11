@@ -13,7 +13,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "doctor": "npx expo-doctor",
-    "seed:buildings": "tsx scripts/seed-buildings.ts"
+    "seed:buildings": "tsx scripts/seed-buildings.ts",
+    "test:rules": "npx --yes firebase-tools@15.30.0 emulators:exec --only firestore --project flushy-flash-rules-test \"npm --prefix rules test\"",
+    "typecheck:all": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json && npm --prefix rules run typecheck"
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.14",
@@ -69,6 +71,10 @@
     "typescript": "6.0.3"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "<rootDir>/node_modules/",
+      "<rootDir>/rules/"
+    ]
   }
 }

@@ -1,0 +1,52 @@
+name: ci
+
+# The PR gate. Deliberately mirrors the verification block in AGENTS.md section 9
+# so local checks and CI cannot drift apart.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same PR cancels the previous run rather than queueing.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: typecheck, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck (app)
+        run: npm run typecheck
+
+      # scripts/ is Node, not React Native, and has its own tsconfig. It is
+      # excluded from the app typecheck, so it needs its own pass or it rots.
+      - name: Typecheck (node scripts)
+        run: npx tsc --noEmit -p scripts/tsconfig.json
+
+      # Includes the no-restricted-imports firewall that keeps app code off
+      # react-native / heroui-native / MapLibre directly.
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # The check that enforces "track the SDK, not npm latest" (AGENTS.md 5).
+      # Without this, dependency drift is invisible until a native build fails.
+      - name: Expo doctor
+        run: npx expo-doctor
