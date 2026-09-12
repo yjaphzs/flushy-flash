@@ -810,6 +810,30 @@ Stubbed — safe places to pick up: the review composer
 (`src/app/(app)/review/[restroomId].tsx`) and notifications
 (`src/app/(app)/(tabs)/notifications.tsx`, blocked on Cloud Functions — see §7).
 
+**Profile is a curved brand band with the avatar straddling its lower edge**,
+decomposed into `src/features/profile/components/`. Three things about it are
+decisions rather than styling, and each has a measurement behind it:
+
+- **The name sits BELOW the gradient, not on it.** White on the brand ramp is
+  6.72:1 on the anchor but **4.09 / 2.16 / 1.55** on `from` / `via` / `to`, so
+  in light mode only the anchor carries white text — and the anchor is not part
+  of the decorative ramp (§14). Text on `--background` sidesteps the question.
+- **The band follows the colour scheme and must keep doing so.** It runs under
+  the status bar, whose text the OS paints to match the scheme: light mode is
+  black on #00926C at **5.33:1** ✓, but a scheme-independent `--nav-*` band
+  would be white on the same colour at **3.94:1** ✗. Dark mode fading to a soft
+  vignette is the price of a legible status bar, not an oversight.
+- **The stats strip shows Saved and Added and deliberately NOT reviews.**
+  `reviewCount` is pinned to 0 by the rules until a Cloud Function maintains it
+  (§7); a stat that is always zero reads as a measurement and is worse than an
+  absent one. Both numbers are derived from stores already in memory.
+
+Rows map only to destinations that exist. **Edit profile** (no such screen),
+**My reviews** (nothing queries reviews by author) and **Delete account** (it
+lives in Settings, with the destructive actions) are absent on purpose. The
+guest branch was moved verbatim and NOT restyled — it is built on
+`JoinBenefits`, which is shared with `/join` and the submit gate.
+
 The feed tab is **gone**. Five slots is the practical maximum for a bottom bar,
 and a feed of strangers' reviews is weak until there is a real user base. The
 follow graph, its `follows` rules and its index are all retained; when the

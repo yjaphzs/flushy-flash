@@ -13,11 +13,13 @@ import EyeOff from 'lucide-react-native/icons/eye-off';
 import Heart from 'lucide-react-native/icons/heart';
 import ImageIcon from 'lucide-react-native/icons/image';
 import Lock from 'lucide-react-native/icons/lock';
+import LogOut from 'lucide-react-native/icons/log-out';
 import Mail from 'lucide-react-native/icons/mail';
 import MapGlyph from 'lucide-react-native/icons/map';
 import LocateFixed from 'lucide-react-native/icons/locate-fixed';
 import MapPin from 'lucide-react-native/icons/map-pin';
 import Plus from 'lucide-react-native/icons/plus';
+import Settings from 'lucide-react-native/icons/settings';
 import ScrollText from 'lucide-react-native/icons/scroll-text';
 import ShowerHead from 'lucide-react-native/icons/shower-head';
 import Sparkles from 'lucide-react-native/icons/sparkles';
@@ -64,6 +66,8 @@ export type IconName =
   | 'map-pin'
   | 'locate-fixed'
   | 'user-round'
+  | 'settings'
+  | 'log-out'
   | 'sparkles'
   | 'star'
   | 'badge-check'
@@ -104,6 +108,8 @@ const GLYPHS: Record<IconName, Glyph> = {
   'map-pin': MapPin,
   'locate-fixed': LocateFixed,
   'user-round': UserRound,
+  settings: Settings,
+  'log-out': LogOut,
   sparkles: Sparkles,
   star: Star,
   'badge-check': BadgeCheck,
