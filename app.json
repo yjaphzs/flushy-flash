@@ -11,7 +11,6 @@
       "bundleIdentifier": "xyz.yjaphzs.flushyflash",
       "supportsTablet": false,
       "deploymentTarget": "16.0",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -20,14 +19,13 @@
       "package": "xyz.yjaphzs.flushyflash",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundImage": "./assets/images/android-icon-background.png",
+        "backgroundColor": "#00855E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.CAMERA",
         "android.permission.INTERNET"
       ]
     },
@@ -41,12 +39,20 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFFFFF",
+          "backgroundColor": "#F4F6F5",
           "dark": {
-            "backgroundColor": "#0B0B0C"
+            "backgroundColor": "#050606"
           },
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 96
+          "imageWidth": 140
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Flushy Flash uses your photos so you can show what a restroom actually looks like.",
+          "cameraPermission": "Flushy Flash uses your camera so you can photograph a restroom entrance as you add it.",
+          "microphonePermission": false
         }
       ],
       [
@@ -58,7 +64,6 @@
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/auth",
       [
         "@maplibre/maplibre-react-native",
         {
@@ -77,7 +82,8 @@
           }
         }
       ],
-      "./plugins/with-release-signing"
+      "./plugins/with-release-signing",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -16,6 +16,16 @@ export type ImageProps = Pick<
   | 'cachePolicy'
   | 'accessibilityLabel'
   | 'testID'
+  /**
+   * Load lifecycle. `onLoad` is not optional polish for the map: MapLibre
+   * rasterises a ViewAnnotation's children into a bitmap on Android, so a photo
+   * that has not decoded yet bakes in blank. `ViewAnnotationRef.refresh()` is
+   * the documented fix and its own docs say to call it "from Image#onLoad".
+   */
+  | 'onLoad'
+  | 'onError'
+  /** Needed by any recycling list of remote images, e.g. a photo strip. */
+  | 'recyclingKey'
 >;
 
 export function Image(props: ImageProps) {

@@ -15,6 +15,13 @@ export type ScrollViewProps = Pick<
   | 'refreshControl'
   | 'keyboardShouldPersistTaps'
   | 'testID'
+  // Keyboard handling. `automaticallyAdjustKeyboardInsets` is the iOS half; it
+  // adjusts contentInset, so it composes with contentInsetAdjustmentBehavior
+  // instead of fighting it the way KeyboardAvoidingView does. Android needs
+  // nothing — the manifest already sets adjustResize with edge-to-edge on.
+  | 'keyboardDismissMode'
+  | 'automaticallyAdjustKeyboardInsets'
+  | 'showsVerticalScrollIndicator'
 >;
 
 export function ScrollView(props: ScrollViewProps) {

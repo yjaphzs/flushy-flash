@@ -3,6 +3,7 @@ import {
   collection,
   count,
   doc,
+  GeoPoint,
   getAggregateFromServer,
   onSnapshot,
   query,
@@ -12,6 +13,7 @@ import {
 } from '@react-native-firebase/firestore';
 
 import { COLLECTIONS, db } from '@/lib/firebase';
+import type { LatLng } from '@/lib/campus';
 import type { Amenities, Restroom } from '@/lib/types';
 
 /** Full-collection listener — see the note in features/buildings/api.ts. */
@@ -21,20 +23,6 @@ export function subscribeToRestrooms(
 ) {
   return onSnapshot(
     collection(db, COLLECTIONS.restrooms),
-    (snap) => {
-      onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Restroom));
-    },
-    onError,
-  );
-}
-
-export function subscribeToRestroomsInBuilding(
-  buildingId: string,
-  onChange: (restrooms: Restroom[]) => void,
-  onError: (error: Error) => void,
-) {
-  return onSnapshot(
-    query(collection(db, COLLECTIONS.restrooms), where('buildingId', '==', buildingId)),
     (snap) => {
       onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Restroom));
     },
@@ -69,22 +57,44 @@ export const EMPTY_AMENITIES: Amenities = {
   genderedAs: null,
 };
 
+/**
+ * Reserves the id a submission will use, before anything is written.
+ *
+ * Photos upload to `restrooms/{id}/…`, so the id has to exist first — and
+ * Firestore generates ids client-side, so no round trip is needed for it.
+ */
+export function newRestroomId() {
+  return doc(collection(db, COLLECTIONS.restrooms)).id;
+}
+
 export async function createRestroom(input: {
-  buildingId: string;
+  id: string;
+  point: LatLng;
+  buildingId: string | null;
   floor: number;
+  landmark: string;
   locationNote: string;
+  photoIds: string[];
   amenities: Amenities;
   createdBy: string;
 }) {
-  const ref = doc(collection(db, COLLECTIONS.restrooms));
+  const ref = doc(db, COLLECTIONS.restrooms, input.id);
   await setDoc(ref, {
+    // GeoPoint takes (latitude, longitude). Our domain type is { lat, lng } and
+    // MapLibre wants [lng, lat] — three orderings for the same pair, which is
+    // why the conversion lives here and at toLngLat() and nowhere else.
+    location: new GeoPoint(input.point.lat, input.point.lng),
     buildingId: input.buildingId,
     floor: input.floor,
+    landmark: input.landmark.trim(),
     locationNote: input.locationNote.trim(),
+    photoIds: input.photoIds,
     amenities: input.amenities,
     status: 'ok',
     ratingSum: 0,
     ratingCount: 0,
+    // Stays 0 forever until a Cloud Function exists — the rules pin it and the
+    // delete rule keys off it. Photo counts come from photoIds.length.
     photoCount: 0,
     verified: false,
     createdBy: input.createdBy,

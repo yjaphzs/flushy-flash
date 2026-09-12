@@ -16,7 +16,7 @@ review feed.
 | Concern | Choice | Note |
 |---|---|---|
 | Framework | Expo SDK 57 (RN 0.86.3) | versions track the SDK exactly — see below |
-| Navigation | expo-router 57 | native `Stack` + `NativeTabs` only |
+| Navigation | expo-router 57 | native `Stack`; tabs use `expo-router/js-tabs` for the floating bar (AGENTS.md §1) |
 | UI | [HeroUI Native](https://heroui.com/docs/native) 1.0.9 | 39 components |
 | Styling | [Uniwind](https://uniwind.dev) 1.12 + Tailwind **v4** | Tailwind is CSS-first: no `tailwind.config.js` |
 | Backend | React Native Firebase 26 | **native** SDKs — Auth, Firestore, Storage, RTDB |

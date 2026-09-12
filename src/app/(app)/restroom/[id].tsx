@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Stack, router, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 
-import { Button } from '@/components/button';
-import { Card } from '@/components/card';
-import { Chip } from '@/components/chip';
-import { ScreenScrollView } from '@/components/screen';
-import { Spinner } from '@/components/spinner';
-import { Text } from '@/components/text';
-import { View } from '@/components/view';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Chip } from '@/components/ui/chip';
+import { ScreenScrollView } from '@/components/layouts/screen';
+import { useRequestWrite } from '@/features/auth/use-auth-gate';
+import { likeRestroom, unlikeRestroom } from '@/features/likes/api';
+import { Icon } from '@/components/ui/icon';
+import { useCanWrite, useUid } from '@/stores/auth-store';
+import { useIsLiked } from '@/stores/likes-store';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
 import { fetchRatingSummary } from '@/features/restrooms/api';
-import { useBuildings, useRestrooms } from '@/stores/campus-store';
+import { useBuildings, useCampusLoading, useRestrooms } from '@/stores/campus-store';
 import type { Amenities } from '@/lib/types';
 
 const AMENITY_LABELS: Record<keyof Omit<Amenities, 'genderedAs'>, string> = {
@@ -24,12 +29,17 @@ const AMENITY_LABELS: Record<keyof Omit<Amenities, 'genderedAs'>, string> = {
 export default function RestroomDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const restrooms = useRestrooms();
+  const requestWrite = useRequestWrite();
+  const uid = useUid();
+  const canWrite = useCanWrite();
   const buildings = useBuildings();
 
   const restroom = restrooms.find((r) => r.id === id);
   const building = buildings.find((b) => b.id === restroom?.buildingId);
 
   const [rating, setRating] = useState<{ average: number | null; count: number } | null>(null);
+  const [ratingFailed, setRatingFailed] = useState(false);
+  const loading = useCampusLoading();
 
   // Read the average from the server rather than a denormalised field: the
   // aggregate is always current, and nothing about it is client-writable.
@@ -37,17 +47,26 @@ export default function RestroomDetailScreen() {
     if (!id) return;
     let cancelled = false;
     fetchRatingSummary(id)
-      .then((r) => !cancelled && setRating(r))
-      .catch(() => !cancelled && setRating({ average: null, count: 0 }));
+      .then((r) => {
+        if (cancelled) return;
+        setRating(r);
+        setRatingFailed(false);
+      })
+      // A failed read is NOT zero reviews. Collapsing the two used to tell the
+      // user a well-reviewed restroom had none, which is worse than saying
+      // nothing.
+      .catch(() => !cancelled && setRatingFailed(true));
     return () => {
       cancelled = true;
     };
   }, [id]);
 
+  // Distinguish "still loading" from "genuinely gone". The store starts empty,
+  // so without this every deep link flashed "no longer listed" first.
   if (!restroom) {
     return (
-      <ScreenScrollView>
-        <Text>This restroom is no longer listed.</Text>
+      <ScreenScrollView contentContainerClassName="flex-1 items-center justify-center gap-3 px-8">
+        {loading ? <Spinner /> : <Text>This restroom is no longer listed.</Text>}
       </ScreenScrollView>
     );
   }
@@ -64,7 +83,7 @@ export default function RestroomDetailScreen() {
           <Text className="text-2xl font-semibold">
             {restroom.locationNote || `Floor ${restroom.floor}`}
           </Text>
-          <Text className="text-muted-foreground">
+          <Text className="text-muted">
             {building?.name} · Floor {restroom.floor}
           </Text>
         </View>
@@ -72,7 +91,9 @@ export default function RestroomDetailScreen() {
         <Card>
           <Card.Body>
             <Card.Title>Rating</Card.Title>
-            {rating === null ? (
+            {ratingFailed ? (
+              <Card.Description>Ratings are unavailable right now.</Card.Description>
+            ) : rating === null ? (
               <Spinner />
             ) : (
               <Card.Description>
@@ -94,10 +115,61 @@ export default function RestroomDetailScreen() {
           </View>
         ) : null}
 
-        <Button onPress={() => router.push(`/review/${restroom.id}`)}>
-          <Button.Label>Write a review</Button.Label>
-        </Button>
+        <View className="flex-row gap-3">
+          <Button
+            className="flex-1"
+            onPress={() => requestWrite({ href: `/review/${restroom.id}`, reason: 'review' })}
+          >
+            <Button.Label>Write a review</Button.Label>
+          </Button>
+          <LikeButton restroomId={restroom.id} uid={uid} canWrite={canWrite} />
+        </View>
       </ScreenScrollView>
     </>
+  );
+}
+
+/**
+ * Saving is optimistic-free on purpose: the listener in useMyLikes owns the
+ * state, so the heart reflects what Firestore actually accepted rather than what
+ * we hoped it would. One extra round trip, no lying UI.
+ *
+ * The filled heart never carries the meaning alone — the accessibility label
+ * says which state it is in, for both screen readers and anyone who cannot
+ * distinguish the fill.
+ */
+function LikeButton({
+  restroomId,
+  uid,
+  canWrite,
+}: {
+  restroomId: string;
+  uid: string | null;
+  canWrite: boolean;
+}) {
+  const requestWrite = useRequestWrite();
+  const liked = useIsLiked(restroomId);
+
+  function onPress() {
+    if (!canWrite || !uid) {
+      requestWrite({ href: `/restroom/${restroomId}`, reason: 'like' });
+      return;
+    }
+    const run = liked ? unlikeRestroom : likeRestroom;
+    // Fire and forget: a failure leaves the heart where it was, which is the
+    // honest outcome, and the listener is the source of truth either way.
+    void run(uid, restroomId).catch(() => {});
+  }
+
+  return (
+    <Button
+      isIconOnly
+      variant="secondary"
+      onPress={onPress}
+      accessibilityLabel={liked ? 'Remove from saved' : 'Save this restroom'}
+      testID="like-restroom"
+    >
+      <Icon name="heart" color={liked ? 'danger' : 'muted'} filled={liked} />
+    </Button>
   );
 }

@@ -31,6 +31,14 @@ export const MapLayer = MLLayer;
 export const MapCallout = MLCallout;
 
 export type { LngLat, LngLatBounds };
+/** The imperative camera handle. Re-exported so `flyTo` callers never
+ *  name a MapLibre type directly — this file stays the only one that does. */
+export type MapCameraRef = React.ComponentRef<typeof MLCamera>;
+/**
+ * The annotation handle. `refresh()` re-captures the Android bitmap after a
+ * child image decodes — see restroom-pin.tsx for why that is not optional.
+ */
+export type MapViewAnnotationRef = React.ComponentRef<typeof MLViewAnnotation>;
 
 /** MapLibre takes [lng, lat]; our domain types use { lat, lng }. Convert here, once. */
 export const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
@@ -54,4 +62,15 @@ export const campusCameraProps = {
   maxBounds: CAMPUS_MAX_BOUNDS,
 } as const;
 
+/**
+ * The stock OpenFreeMap style URL, still env-driven. Kept as the documented
+ * escape hatch (`EXPO_PUBLIC_MAP_STYLE_URL`) for anyone pointing the app at
+ * MapTiler or Protomaps; the app itself now renders the authored theme below.
+ */
 export const MAP_STYLE = MAP_STYLE_URL;
+
+/**
+ * The app's own theme, light and dark. Exported from here so `mapStyle` callers
+ * keep going through the one file that names MapLibre (AGENTS.md §8).
+ */
+export { useMapStyle } from '@/components/common/map-style';

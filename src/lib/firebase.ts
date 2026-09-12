@@ -46,9 +46,12 @@ export const COLLECTIONS = {
   users: 'users',
   handles: 'handles',
   follows: 'follows',
+  likes: 'likes',
 } as const;
 
 /** Composite ids that let security rules enforce uniqueness without a query. */
 export const reviewId = (restroomId: string, uid: string) => `${restroomId}_${uid}`;
 export const followId = (followerId: string, followeeId: string) =>
   `${followerId}_${followeeId}`;
+// Actor first, matching followId — a user's own likes read naturally this way.
+export const likeId = (uid: string, restroomId: string) => `${uid}_${restroomId}`;

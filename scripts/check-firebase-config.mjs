@@ -19,8 +19,22 @@ const platform = process.argv.includes('--platform')
   ? process.argv[process.argv.indexOf('--platform') + 1]
   : 'all';
 
+const appJson = JSON.parse(readFileSync(resolve(ROOT, 'app.json'), 'utf8'));
+
+/**
+ * Whether iOS needs a plist is read from app.json, not assumed from the
+ * platform flag — same reasoning as the package-name check below: derive it so
+ * a config change can never leave this out of date.
+ *
+ * There is no iOS app registered in the Firebase project today (only Android),
+ * so `ios.googleServicesFile` is absent and this is false. Add the iOS app,
+ * download the plist, put the key back in app.json, and this starts enforcing
+ * it again with no edit here.
+ */
+const declaresIos = Boolean(appJson?.expo?.ios?.googleServicesFile);
+
 const needsAndroid = platform === 'all' || platform === 'android';
-const needsIos = platform === 'all' || platform === 'ios';
+const needsIos = (platform === 'all' || platform === 'ios') && declaresIos;
 
 const missing = [];
 if (needsAndroid && !existsSync(ANDROID)) missing.push('google-services.json');
@@ -34,7 +48,6 @@ if (missing.length === 0) {
 
       // Read the expected package from app.json rather than hardcoding it, so a
       // rename can never leave this check silently out of date.
-      const appJson = JSON.parse(readFileSync(resolve(ROOT, 'app.json'), 'utf8'));
       const expected = appJson?.expo?.android?.package;
 
       // A google-services.json legitimately holds one client per registered app,

@@ -50,6 +50,25 @@ export const env = {
   mapStyleUrl:
     process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? 'https://tiles.openfreemap.org/styles/liberty',
 
+  /**
+   * OAuth web client id (`client_type: 3` in google-services.json).
+   *
+   * This is the one Google/Firebase identifier that legitimately belongs here,
+   * and it is not a counter-example to the note above. The vars that rule bans
+   * are the ones the NATIVE SDK reads for itself out of google-services.json /
+   * GoogleService-Info.plist — duplicating those in env would be config that
+   * looks meaningful and does nothing.
+   *
+   * This value is different: it is consumed by JavaScript, in
+   * `GoogleSignin.configure({ webClientId })`, and without it `signIn()` returns
+   * a null idToken and Firebase has nothing to exchange. It is not secret — it
+   * ships inside the APK either way.
+   *
+   * Empty means Google Sign-In is unconfigured; features/auth/api.ts treats that
+   * as "hide the button" rather than failing at the tap.
+   */
+  googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '',
+
   firebase: {
     /**
      * Point the app at locally running Firebase emulators instead of the real

@@ -32,6 +32,10 @@ yarn-error.*
 
 # local env files
 .env*.local
+# `.env*.local` does NOT match a bare `.env`. The repo is public, and
+# .env.example's tooling section documents admin credentials for
+# `seed:buildings --upload` — which belong in a .env by convention. Ignore it.
+.env
 
 # typescript
 *.tsbuildinfo

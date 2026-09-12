@@ -45,10 +45,23 @@ let testEnv: RulesTestEnvironment;
 const BUILDING_ID = 'administration-building';
 const RESTROOM_ID = 'restroom-1';
 
+/** Inside CAMPUS_BOUNDS — the Administration Building, same point as the fixture. */
+const ON_CAMPUS = new GeoPoint(15.7313583, 120.9302984);
+/** Rizal Park, Manila. Comfortably outside the bounding box. */
+const OFF_CAMPUS = new GeoPoint(14.5826, 120.9787);
+
+/** N storage object paths, for exercising the photo cap. */
+function photoPaths(n: number) {
+  return Array.from({ length: n }, (_, i) => `restrooms/${RESTROOM_ID}/p${i}.webp`);
+}
+
 function restroomDoc(overrides: Record<string, unknown> = {}) {
   return {
+    location: ON_CAMPUS,
     buildingId: BUILDING_ID,
     floor: 1,
+    landmark: 'CLSU Lagoon',
+    photoIds: [],
     locationNote: 'Near the east stairwell',
     amenities: {
       isFree: true,
@@ -137,18 +150,182 @@ beforeEach(async () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    // Every create path now goes through hasProfile(), which requires
+    // users/{uid} to exist. Without these the whole write half of this suite
+    // would fail, and for the wrong reason.
+    await setDoc(doc(db, 'users', ALICE), { ...profileDoc(), createdAt: new Date() });
+    await setDoc(doc(db, 'users', BOB), {
+      ...profileDoc({ handle: 'bob', displayName: 'Bob' }),
+      createdAt: new Date(),
+    });
   });
 });
 
 describe('unauthenticated access', () => {
-  it('denies reading restrooms while signed out', async () => {
+  // The app is guest-first: someone opens it and gets a working map before any
+  // account exists. These are that promise, written as tests. The previous
+  // version of this block asserted the exact opposite for restrooms.
+  it('allows reading buildings while signed out', async () => {
     const db = testEnv.unauthenticatedContext().firestore();
-    await assertFails(getDoc(doc(db, 'restrooms', RESTROOM_ID)));
+    await assertSucceeds(getDoc(doc(db, 'buildings', BUILDING_ID)));
+  });
+
+  it('allows reading restrooms while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, 'restrooms', RESTROOM_ID)));
+  });
+
+  it('allows reading reviews while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, 'reviews', RESTROOM_ID + '_' + ALICE)));
+  });
+
+  it('allows reading a public user profile while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, 'users', ALICE)));
   });
 
   it('allows reading handles while signed out, so sign-up can check availability', async () => {
     const db = testEnv.unauthenticatedContext().firestore();
     await assertSucceeds(getDoc(doc(db, 'handles', 'someone')));
+  });
+
+  // ...and these are the boundary that makes the reads above safe to open.
+  it('denies reading private user data while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'users', ALICE, 'private', 'contact')));
+  });
+
+  it('denies reading the follow graph while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'follows', ALICE + '_' + BOB)));
+  });
+
+  it('denies reading who liked what while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID)));
+  });
+
+  it('denies writing a restroom while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, 'restrooms', 'guest-1'), restroomDoc()));
+  });
+
+  it('denies writing a review while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, 'reviews', RESTROOM_ID + '_guest'), reviewDoc()));
+  });
+
+  it('denies claiming a handle while signed out', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, 'handles', 'guest'), { uid: 'guest', createdAt: new Date() }));
+  });
+
+  it('still denies anything outside the named collections', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'secrets', 'anything')));
+  });
+});
+
+describe('accounts without a profile', () => {
+  // The gap between "authenticated" and "finished onboarding". hasProfile() is
+  // what makes the client's canWrite capability a real boundary rather than a
+  // convention the UI happens to follow.
+  const GHOST = 'ghost-uid';
+
+  it('denies creating a restroom before the profile exists', async () => {
+    const db = testEnv.authenticatedContext(GHOST, clsuStudent).firestore();
+    await assertFails(setDoc(doc(db, 'restrooms', 'ghost-1'), restroomDoc({ createdBy: GHOST })));
+  });
+
+  it('denies creating a review before the profile exists', async () => {
+    const db = testEnv.authenticatedContext(GHOST, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'reviews', RESTROOM_ID + '_' + GHOST), reviewDoc({ authorId: GHOST })),
+    );
+  });
+
+  it('denies liking a restroom before the profile exists', async () => {
+    const db = testEnv.authenticatedContext(GHOST, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'likes', GHOST + '_' + RESTROOM_ID), {
+        userId: GHOST,
+        restroomId: RESTROOM_ID,
+        createdAt: serverTimestamp(),
+      }),
+    );
+  });
+});
+
+describe('likes', () => {
+  function likeDoc(overrides: Record<string, unknown> = {}) {
+    return {
+      userId: ALICE,
+      restroomId: RESTROOM_ID,
+      createdAt: serverTimestamp(),
+      ...overrides,
+    };
+  }
+
+  async function seedAliceLike() {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'likes', ALICE + '_' + RESTROOM_ID), {
+        ...likeDoc(),
+        createdAt: new Date(),
+      });
+    });
+  }
+
+  it('allows a user with a profile to like a real restroom', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(setDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID), likeDoc()));
+  });
+
+  it('denies a like whose document id does not match the author', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(setDoc(doc(db, 'likes', BOB + '_' + RESTROOM_ID), likeDoc({ userId: BOB })));
+  });
+
+  it('denies liking on behalf of someone else', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(setDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID), likeDoc({ userId: BOB })));
+  });
+
+  it('denies liking a restroom that does not exist', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(setDoc(doc(db, 'likes', ALICE + '_ghost'), likeDoc({ restroomId: 'ghost' })));
+  });
+
+  it('rejects an unknown field', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID), likeDoc({ note: 'sneaky' })),
+    );
+  });
+
+  it('never allows an update - unliking is a delete', async () => {
+    await seedAliceLike();
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID), { restroomId: 'x' }));
+  });
+
+  it('allows a user to remove their own like', async () => {
+    await seedAliceLike();
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID)));
+  });
+
+  it('denies reading another users likes - saved lists are private', async () => {
+    await seedAliceLike();
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(getDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID)));
+  });
+
+  it('denies deleting another users like', async () => {
+    await seedAliceLike();
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(deleteDoc(doc(db, 'likes', ALICE + '_' + RESTROOM_ID)));
   });
 });
 
@@ -214,6 +391,72 @@ describe('restrooms', () => {
     await assertSucceeds(updateDoc(doc(db, 'restrooms', RESTROOM_ID), { verified: true }));
   });
 
+  it('allows a restroom with no building — a pin beside the lagoon', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'restrooms', 'restroom-outdoors'), restroomDoc({ buildingId: null })),
+    );
+  });
+
+  it('denies naming a building that does not exist', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restrooms', 'restroom-2'), restroomDoc({ buildingId: 'no-such-building' })),
+    );
+  });
+
+  // The pin is attacker-controlled, unlike the admin-seeded building points.
+  it('denies a pin outside the campus bounding box', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restrooms', 'restroom-2'), restroomDoc({ location: OFF_CAMPUS })),
+    );
+  });
+
+  it('denies creating a restroom with no location at all', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    const { location: _omitted, ...noLocation } = restroomDoc();
+    await assertFails(setDoc(doc(db, 'restrooms', 'restroom-2'), noLocation));
+  });
+
+  it('denies moving an existing pin off campus', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'restrooms', RESTROOM_ID), { location: OFF_CAMPUS }));
+  });
+
+  it('denies more than five photos', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restrooms', 'restroom-2'), restroomDoc({ photoIds: photoPaths(6) })),
+    );
+  });
+
+  it('allows up to five photos', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'restrooms', 'restroom-2'), restroomDoc({ photoIds: photoPaths(5) })),
+    );
+  });
+
+  // photoIds is client-written; photoCount is NOT, and the delete rule keys off
+  // it. Recording photos must never move the aggregate.
+  it('denies bumping photoCount alongside photoIds', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'restrooms', RESTROOM_ID), {
+        photoIds: [`restrooms/${RESTROOM_ID}/p0.jpg`],
+        photoCount: 1,
+      }),
+    );
+  });
+
+  it('denies a landmark longer than the cap', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restrooms', 'restroom-2'), restroomDoc({ landmark: 'x'.repeat(81) })),
+    );
+  });
+
   it('denies deleting a restroom that already has reviews', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await updateDoc(doc(ctx.firestore(), 'restrooms', RESTROOM_ID), { ratingCount: 3 });
@@ -229,6 +472,22 @@ describe('reviews', () => {
   it('allows an author to write their own review at the composite id', async () => {
     const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
     await assertSucceeds(setDoc(doc(db, 'reviews', aliceReview), reviewDoc()));
+  });
+
+  // The review cap had NO coverage at all, which is how it sat at 6 while the
+  // restroom cap moved — both now go through isValidPhotoIds().
+  it('allows up to five photos on a review', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'reviews', aliceReview), reviewDoc({ photoIds: photoPaths(5) })),
+    );
+  });
+
+  it('denies more than five photos on a review', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'reviews', aliceReview), reviewDoc({ photoIds: photoPaths(6) })),
+    );
   });
 
   // The composite id IS the uniqueness constraint. If this passes, a user can
@@ -281,6 +540,17 @@ describe('reviews', () => {
 });
 
 describe('users and the verified-student badge', () => {
+  // The global fixture seeds users/{ALICE} and users/{BOB} so every write path
+  // can satisfy hasProfile(). This block is about CREATING a profile, so it has
+  // to start without one - otherwise setDoc is evaluated as an update and fails
+  // on unchanged(['createdAt']) rather than on anything the test is asking about.
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), 'users', ALICE));
+      await deleteDoc(doc(ctx.firestore(), 'users', BOB));
+    });
+  });
+
   it('allows creating your own profile', async () => {
     const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
     await assertSucceeds(setDoc(doc(db, 'users', ALICE), profileDoc()));
