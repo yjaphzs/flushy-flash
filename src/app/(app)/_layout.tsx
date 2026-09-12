@@ -1,6 +1,23 @@
 import { Stack } from 'expo-router';
 
+import { useAuthGateResume } from '@/features/auth/use-auth-gate';
+import { useCampusData } from '@/hooks/use-campus-data';
+import { useMyLikes } from '@/hooks/use-my-likes';
+
 export default function AppLayout() {
+  // Mounted here rather than on the map tab. (app) is now permanently mounted
+  // and no longer tied to the map's lifecycle, so a deep link straight to
+  // /building/x or /restroom/y gets data without the map ever having rendered —
+  // which is what makes "This restroom is no longer listed." an honest message
+  // instead of a race.
+  useCampusData();
+
+  // Picks up where the user was going before the gate interrupted them.
+  useAuthGateResume();
+
+  // Keyed on uid: clears on sign-out, re-opens on sign-in.
+  useMyLikes();
+
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

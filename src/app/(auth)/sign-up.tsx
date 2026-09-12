@@ -1,107 +1,144 @@
-import { useState } from 'react';
-import { Link } from 'expo-router';
+import { useRef } from 'react';
+import { Link, router } from 'expo-router';
 
-import { Button } from '@/components/button';
-import { ScreenScrollView } from '@/components/screen';
-import { Text } from '@/components/text';
-import { View } from '@/components/view';
-import {
-  TextField,
-  TextFieldDescription,
-  TextFieldError,
-  TextFieldInput,
-  TextFieldLabel,
-} from '@/components/text-field';
-import { isHandleAvailable, isValidHandle, normalizeHandle, signUp } from '@/features/auth/api';
+import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/feedback/callout';
+import { Field, type TextInputHandle } from '@/components/forms/field';
+import { Pressable } from '@/components/ui/pressable';
+import { LabeledSeparator } from '@/components/ui/separator';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
+import { CampusDomain } from '@/components/common/email-text';
+import { AuthScreen } from '@/features/auth/components/auth-screen';
+import { GoogleButton } from '@/features/auth/components/google-button';
+import { isGoogleSignInConfigured } from '@/features/auth/google';
+import { PasswordStrength } from '@/features/auth/components/password-strength';
+import { useSignUpForm } from '@/features/auth/use-sign-up-form';
 import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
 
+/**
+ * Credentials only. The display name and @handle are asked for after the address
+ * is confirmed, on (auth)/complete-profile — which is both a shorter form
+ * here and the thing that makes `verifiedStudent` correct when the profile is
+ * finally written (see signUp in features/auth/api.ts).
+ */
 export default function SignUpScreen() {
-  const [displayName, setDisplayName] = useState('');
-  const [handle, setHandle] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function onSubmit() {
-    setBusy(true);
-    setError(null);
-    try {
-      const normalized = normalizeHandle(handle);
-      if (!isValidHandle(normalized)) {
-        throw new Error('Handle must be 3–20 characters: letters, numbers or underscore.');
-      }
-      if (!(await isHandleAvailable(normalized))) {
-        throw new Error(`@${normalized} is already taken.`);
-      }
-      await signUp({ email, password, displayName, handle: normalized });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not create your account.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const ready = displayName && handle && email && password;
+  const passwordRef = useRef<TextInputHandle>(null);
+  const confirmRef = useRef<TextInputHandle>(null);
+  const form = useSignUpForm();
 
   return (
-    <ScreenScrollView contentContainerClassName="px-5 pt-24 gap-5">
-      <View className="gap-1">
-        <Text className="text-3xl font-semibold">Create account</Text>
-        <Text className="text-muted-foreground">
-          Anyone can join. Verify a {CLSU_EMAIL_DOMAIN} address to get the student badge.
-        </Text>
+    <AuthScreen
+      title="Create your account"
+      subtitle={
+        <>
+          Anyone can join. Verify a <CampusDomain /> address to get the student badge.
+        </>
+      }
+      onBack={router.canGoBack() ? () => router.back() : undefined}
+      testID="sign-up-screen"
+    >
+      {form.formError ? (
+        <Callout tone="danger" testID="sign-up-error">
+          <Text type="body-sm">{form.formError}</Text>
+        </Callout>
+      ) : null}
+
+      <View className="gap-4">
+        <Field isInvalid={Boolean(form.emailError)}>
+          <Field.Label>Email</Field.Label>
+          <Field.Input
+            value={form.email}
+            onChangeText={form.setEmail}
+            onBlur={() => form.touch('email')}
+            leading="mail"
+            placeholder={`you@${CLSU_EMAIL_DOMAIN}`}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            testID="sign-up-email"
+          />
+          {form.emailError ? <Field.Error>{form.emailError}</Field.Error> : null}
+        </Field>
+
+        <Field isInvalid={Boolean(form.passwordError)}>
+          <Field.Label>Password</Field.Label>
+          <Field.PasswordInput
+            ref={passwordRef}
+            value={form.password}
+            onChangeText={form.setPassword}
+            onBlur={() => form.touch('password')}
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            passwordRules="minlength: 8;"
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => confirmRef.current?.focus()}
+            testID="sign-up-password"
+          />
+          {form.passwordError ? <Field.Error>{form.passwordError}</Field.Error> : null}
+          {form.password.length > 0 ? <PasswordStrength score={form.score} /> : null}
+        </Field>
+
+        <Field isInvalid={Boolean(form.confirmError)}>
+          <Field.Label>Confirm password</Field.Label>
+          <Field.PasswordInput
+            ref={confirmRef}
+            value={form.confirm}
+            onChangeText={form.setConfirm}
+            onBlur={() => form.touch('confirm')}
+            placeholder="Type it again"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            returnKeyType="go"
+            submitBehavior="blurAndSubmit"
+            onSubmitEditing={form.submit}
+            testID="sign-up-confirm"
+          />
+          {form.confirmError ? <Field.Error>{form.confirmError}</Field.Error> : null}
+        </Field>
       </View>
 
-      <TextField>
-        <TextFieldLabel>Display name</TextFieldLabel>
-        <TextFieldInput value={displayName} onChangeText={setDisplayName} placeholder="Juan Dela Cruz" />
-      </TextField>
-
-      <TextField>
-        <TextFieldLabel>Handle</TextFieldLabel>
-        <TextFieldInput
-          value={handle}
-          onChangeText={setHandle}
-          autoCapitalize="none"
-          placeholder="juan_dc"
-        />
-        <TextFieldDescription>Your unique @name. Cannot be changed later.</TextFieldDescription>
-      </TextField>
-
-      <TextField>
-        <TextFieldLabel>Email</TextFieldLabel>
-        <TextFieldInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          placeholder={`you@${CLSU_EMAIL_DOMAIN}`}
-        />
-      </TextField>
-
-      <TextField>
-        <TextFieldLabel>Password</TextFieldLabel>
-        <TextFieldInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoComplete="new-password"
-          placeholder="At least 8 characters"
-        />
-        {error ? <TextFieldError>{error}</TextFieldError> : null}
-      </TextField>
-
-      <Button onPress={onSubmit} isDisabled={busy || !ready}>
-        <Button.Label>{busy ? 'Creating…' : 'Create account'}</Button.Label>
+      <Button
+        size="lg"
+        className="rounded-full"
+        onPress={form.submit}
+        isDisabled={form.busy || !form.ready}
+      >
+        {form.busy ? <Spinner size="sm" /> : null}
+        <Button.Label>{form.busy ? 'Creating account…' : 'Create account'}</Button.Label>
       </Button>
 
-      <View className="items-center">
-        <Link href="/sign-in">
-          <Text className="text-sm text-muted-foreground">I already have an account</Text>
+      {isGoogleSignInConfigured() ? (
+        <>
+          <LabeledSeparator label="Or continue with" />
+          <GoogleButton
+            onPress={form.submitGoogle}
+            isDisabled={form.busy}
+            testID="sign-up-google"
+          />
+        </>
+      ) : null}
+
+      <View className="flex-row items-center justify-center gap-1">
+        <Text type="body-sm" color="muted">
+          Already have an account?
+        </Text>
+        <Link href="/sign-in" asChild>
+          <Pressable hitSlop={12} accessibilityRole="link" accessibilityLabel="Sign in">
+            <Text type="body-sm" weight="semibold" className="text-link">
+              Sign in
+            </Text>
+          </Pressable>
         </Link>
       </View>
-    </ScreenScrollView>
+    </AuthScreen>
   );
 }

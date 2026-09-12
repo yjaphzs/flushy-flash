@@ -1,5 +1,8 @@
 # Flushy Flash
 
+[![ci](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml)
+[![firebase-rules](https://github.com/yjaphzs/flushy-flash/actions/workflows/firebase-rules.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/firebase-rules.yml)
+
 A campus restroom finder for **Central Luzon State University**. Map of campus
 restrooms, student submissions with photos, reviews and ratings, profiles and a
 review feed.
@@ -13,7 +16,7 @@ review feed.
 | Concern | Choice | Note |
 |---|---|---|
 | Framework | Expo SDK 57 (RN 0.86.3) | versions track the SDK exactly — see below |
-| Navigation | expo-router 57 | native `Stack` + `NativeTabs` only |
+| Navigation | expo-router 57 | native `Stack`; tabs use `expo-router/js-tabs` for the floating bar (AGENTS.md §1) |
 | UI | [HeroUI Native](https://heroui.com/docs/native) 1.0.9 | 39 components |
 | Styling | [Uniwind](https://uniwind.dev) 1.12 + Tailwind **v4** | Tailwind is CSS-first: no `tailwind.config.js` |
 | Backend | React Native Firebase 26 | **native** SDKs — Auth, Firestore, Storage, RTDB |
@@ -41,21 +44,60 @@ passing is the check that this still holds.
 npm install
 ```
 
-Then supply your own Firebase config — the app will not build without it:
+Then supply a Firebase config — **the app cannot build without one**, because the
+native SDKs read it at prebuild time. It is gitignored (this repo is public), so
+every fresh clone needs it. `npm run prebuild` checks for it and tells you what to
+do rather than failing with a raw ENOENT.
 
-1. Firebase Console → add an **Android** app with package `dev.g2c.flushyflash`
+**Option A — real Firebase project.** Needed for anything beyond local UI work.
+
+1. Firebase Console → add an **Android** app with package `xyz.yjaphzs.flushyflash`
    → download `google-services.json` → place at the repo root.
 2. Add an **iOS** app with the same bundle id → download
    `GoogleService-Info.plist` → place at the repo root.
 3. Enable **Email/Password** under Authentication → Sign-in method.
 4. Create the Firestore database.
 
+With the Firebase CLI authenticated (`npx firebase-tools login --reauth`) you can
+skip the download:
+
+```bash
+npx firebase-tools apps:sdkconfig android --project <your-project-id> > google-services.json
+```
+
+**Refreshing the config.** If you register a new SHA-1 or change apps, re-pull it
+rather than hand-editing:
+
+```bash
+npm run firebase:sdkconfig    # overwrites google-services.json
+```
+
+Do not use `... > google-services.json` — a shell redirect writes the CLI's error
+text into the file when the command fails, producing a file that looks present but
+is not JSON.
+
+**Option B — emulators only.** No Firebase account required; good for UI work.
+
+```bash
+npm run firebase:placeholder     # writes a structurally valid fake config
+echo "EXPO_PUBLIC_FIREBASE_USE_EMULATORS=true" >> .env.local
+npm run firebase:emulators       # in a second terminal
+```
+
+The placeholder is recognised on every prebuild and warns you it is in use, so
+you cannot mistake it for a real backend.
+
 Deploy the security rules **before** running the app — they are the actual
 security boundary, not a formality:
 
 ```bash
-npx firebase-tools@latest deploy --only firestore:rules,firestore:indexes,storage,database
+npm run test:rules     # prove them first: 37 adversarial cases
+npm run deploy:rules   # firestore rules + indexes, RTDB, storage
 ```
+
+In CI, `firebase-rules.yml` does exactly this on every push to `main` that touches
+a rules file — but only after the attack matrix passes. It needs two repo secrets:
+`FIREBASE_TOKEN` (from `npx firebase-tools login:ci`) and `FIREBASE_PROJECT_ID`.
 
 Seed the campus buildings from OpenStreetMap (see below), then build:
 
@@ -75,16 +117,35 @@ no mapped restrooms. So buildings are seeded automatically and restrooms are
 crowd-sourced.
 
 ```bash
-npm run seed:buildings                              # fetch → scripts/buildings.seed.csv
-# review the CSV (see warnings it prints), then:
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json \
-  npx tsx scripts/seed-buildings.ts --upload
+npm run seed:buildings                     # fetch → scripts/buildings.seed.csv
+# review the CSV (see the warnings it prints), then authenticate and upload:
+gcloud auth application-default login
+npx tsx scripts/seed-buildings.ts --upload
 ```
 
 The OSM data is genuinely messy, so the script normalises apostrophes, de-dupes
 by name + proximity, and **flags ambiguities for a human** rather than guessing:
 several colleges (Engineering, Education) are mapped as 2–3 separate wings under
 one name. Review those rows and give them distinct names before uploading.
+
+### Why the upload needs admin credentials
+
+`google-services.json` cannot do this, and the reason is worth understanding —
+the two credentials are opposites:
+
+| | `google-services.json` | service account / ADC |
+|---|---|---|
+| Kind | **Client** config | **Admin** credential |
+| Privileges | None — every action gated by `firestore.rules` | **Bypasses rules entirely** |
+| Exposure | Ships inside every APK, extractable | A genuine secret |
+
+The seed needs admin because `firestore.rules` makes `buildings` **admin-write-only**
+— students add restrooms, not buildings — so no client credential can write them.
+
+`gcloud auth application-default login` is preferred: it leaves no downloadable
+key. A service-account key (`GOOGLE_APPLICATION_CREDENTIALS=./service-account.json`)
+also works and is what unattended CI would use, but it is a long-lived secret with
+full project access. It is gitignored; keep it that way.
 
 ## Project layout
 
@@ -128,6 +189,54 @@ memory, so filtering and "nearest" sorting are array operations
 than estimated — including why the default camera is the administrative core and
 not the geometric centroid (which sits in CLSU's farmland).
 
+## Install the app
+
+Grab the APK from [Releases](https://github.com/yjaphzs/flushy-flash/releases) and
+open it on your Android phone. You will need to allow installs from unknown
+sources the first time. Requires Android 7.0 or newer.
+
+## Environment
+
+Copy `.env.example` to `.env.local`. Every value has a working default, so the app
+runs with no `.env` file at all.
+
+Note there is deliberately **no `EXPO_PUBLIC_FIREBASE_API_KEY`**. This app uses the
+native Firebase SDKs, which read project config from `google-services.json` /
+`GoogleService-Info.plist` at prebuild — there is no `initializeApp({ apiKey })`
+call, so such a variable would do nothing. To use a different Firebase project,
+swap those files and re-run `npx expo prebuild --clean`.
+
+What *is* configurable: emulator routing and the map tile URL. To run against
+local emulators, set `EXPO_PUBLIC_FIREBASE_USE_EMULATORS=true` — and note the
+Android emulator reaches your machine at `10.0.2.2`, not `localhost`, while a
+physical device needs your LAN IP in `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST`.
+
+## CI and releases
+
+`main` is protected; work happens on `feat/`, `fix/` and `chore/` branches and
+merges via PR. **PR titles become the release notes**, so write them for someone
+who was not involved.
+
+| Workflow | Trigger |
+|---|---|
+| `ci` | every PR — typecheck, lint, test, expo-doctor |
+| `firebase-rules` | rules changes — runs the attack matrix, deploys on main |
+| `native-check` | native config changes — prebuild + assembleDebug |
+| `release` | a `v*` tag — signed APK attached to a GitHub Release |
+
+Cutting a release:
+
+```bash
+npm version minor --no-git-tag-version   # then match expo.version in app.json
+git commit -am "chore: release v1.1.0"
+git tag v1.1.0 && git push origin main --tags
+```
+
+Release builds need these repo secrets: `GOOGLE_SERVICES_JSON`,
+`ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
+`ANDROID_KEY_PASSWORD`. Generate the keystore once and **back it up offline** —
+losing it means installed apps can never be updated again.
+
 ## Verify
 
 ```bash
@@ -136,6 +245,7 @@ npx tsc --noEmit -p scripts/tsconfig.json  # node scripts
 npm run lint
 npm test
 npx expo-doctor
+npm run test:rules                         # security rules (needs Java)
 ```
 
 ## Status

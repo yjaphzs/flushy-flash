@@ -15,8 +15,10 @@
  *   npx tsx scripts/seed-buildings.ts            # fetch + write review CSV
  *   npx tsx scripts/seed-buildings.ts --upload   # upload the reviewed CSV
  *
- * Uploading needs admin credentials:
- *   GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+ * Uploading needs ADMIN credentials, because firestore.rules makes `buildings`
+ * admin-write-only. Prefer short-lived local credentials:
+ *   gcloud auth application-default login
+ * See the note above upload() for why the client config cannot do this.
  */
 
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
@@ -205,40 +207,134 @@ function fromCsv(csv: string): SeedBuilding[] {
   });
 }
 
+/**
+ * Why this needs ADMIN credentials at all.
+ *
+ * `google-services.json` is CLIENT config: it identifies the app and grants no
+ * privileges — everything it can do is gated by firestore.rules. The `buildings`
+ * collection is deliberately admin-write-only there (students add restrooms, not
+ * buildings), so no client credential can seed it. The Admin SDK bypasses rules
+ * entirely, which is exactly why it is a real secret and the client config is not.
+ *
+ * Two ways to provide it, in order of preference:
+ *
+ *   1. gcloud auth application-default login   ← preferred
+ *      Short-lived local credentials. Nothing downloadable to leak.
+ *
+ *   2. GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+ *      A long-lived private key with full project access. Use only where (1)
+ *      cannot work, such as unattended CI. Never commit it.
+ *
+ * `applicationDefault()` resolves both: it reads GOOGLE_APPLICATION_CREDENTIALS
+ * when set, and otherwise falls back to the gcloud ADC file.
+ */
 async function upload(buildings: SeedBuilding[]) {
-  const { cert, initializeApp } = await import('firebase-admin/app');
+  const { applicationDefault, initializeApp } = await import('firebase-admin/app');
   const { getFirestore, GeoPoint, FieldValue } = await import('firebase-admin/firestore');
 
-  const credsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  if (!credsPath || !existsSync(credsPath)) {
-    throw new Error('Set GOOGLE_APPLICATION_CREDENTIALS to a service-account JSON file.');
+  const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (keyPath && !existsSync(keyPath)) {
+    throw new Error(`GOOGLE_APPLICATION_CREDENTIALS points to a missing file: ${keyPath}`);
   }
 
-  initializeApp({ credential: cert(JSON.parse(readFileSync(credsPath, 'utf8'))) });
+  try {
+    initializeApp({
+      credential: applicationDefault(),
+      projectId: process.env.FIREBASE_PROJECT_ID ?? 'flushy-flash',
+    });
+  } catch {
+    throw new Error(
+      'No admin credentials found.\n\n' +
+        '  Preferred — short-lived, nothing to leak:\n' +
+        '    gcloud auth application-default login\n\n' +
+        '  Or, a long-lived service-account key (full project access, keep it out of git):\n' +
+        '    Firebase console -> Project settings -> Service accounts -> Generate new private key\n' +
+        '    GOOGLE_APPLICATION_CREDENTIALS=./service-account.json npm run seed:buildings -- --upload\n',
+    );
+  }
+
+  console.log(
+    keyPath
+      ? `Authenticating with the service-account key at ${keyPath}`
+      : 'Authenticating with gcloud application-default credentials',
+  );
+
   const db = getFirestore();
+
+  // Credentials resolve lazily, at request time — not during initializeApp. So a
+  // stale or missing ADC token surfaces as a 20-line gRPC stack trace on the
+  // first write rather than anything actionable. Exercise them up front with one
+  // cheap read and translate the failure.
+  try {
+    await db.collection('buildings').limit(1).get();
+  } catch (err) {
+    throw new Error(explainAuthFailure(err));
+  }
+
+  // Which docs already exist, so a re-run does not clobber fields that must only
+  // ever be written once. One read of ~100 ids is far cheaper than getting this
+  // wrong. restroomCount is maintained elsewhere and createdAt is immutable, so
+  // neither may be included in an update payload.
+  const existing = new Set<string>();
+  const current = await db.collection('buildings').select().get();
+  current.forEach((d) => existing.add(d.id));
+  if (existing.size > 0) {
+    console.log(`  ${existing.size} building(s) already present — reconciling, not duplicating`);
+  }
 
   // Batched, and keyed by a stable slug id, so re-running reconciles rather than
   // duplicating. Firestore caps a batch at 500 writes.
   for (let i = 0; i < buildings.length; i += 400) {
     const batch = db.batch();
     for (const b of buildings.slice(i, i + 400)) {
+      const shared = {
+        name: b.name,
+        code: b.code,
+        aliases: b.aliases,
+        location: new GeoPoint(b.lat, b.lng),
+        osmId: b.osmId,
+      };
       batch.set(
         db.collection('buildings').doc(b.id),
-        {
-          name: b.name,
-          code: b.code,
-          aliases: b.aliases,
-          location: new GeoPoint(b.lat, b.lng),
-          osmId: b.osmId,
-          restroomCount: 0,
-          createdAt: FieldValue.serverTimestamp(),
-        },
+        existing.has(b.id)
+          ? shared
+          : { ...shared, restroomCount: 0, createdAt: FieldValue.serverTimestamp() },
         { merge: true },
       );
     }
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (err) {
+      throw new Error(explainAuthFailure(err));
+    }
     console.log(`  uploaded ${Math.min(i + 400, buildings.length)}/${buildings.length}`);
   }
+}
+
+/** Turns an opaque Google auth/permission error into something actionable. */
+function explainAuthFailure(err: unknown): string {
+  const raw = err instanceof Error ? `${err.message} ${(err as { details?: string }).details ?? ''}` : String(err);
+
+  const expired = /invalid_grant|invalid_rapt|reauth|Could not refresh access token|UNAUTHENTICATED/i.test(raw);
+  const denied = /PERMISSION_DENIED|403|Missing or insufficient permissions/i.test(raw);
+
+  if (expired) {
+    return (
+      'Admin credentials are present but expired or need re-consent.\n\n' +
+      '  Refresh them:\n' +
+      '    gcloud auth application-default login\n\n' +
+      `  Original error: ${raw.trim().slice(0, 200)}`
+    );
+  }
+  if (denied) {
+    return (
+      'Authenticated, but this identity cannot write to the project.\n\n' +
+      '  Confirm the account owns flushy-flash, or that the service-account key\n' +
+      '  has the Cloud Datastore User / Firebase Admin role.\n\n' +
+      `  Original error: ${raw.trim().slice(0, 200)}`
+    );
+  }
+  return raw;
 }
 
 async function main() {

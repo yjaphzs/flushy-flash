@@ -28,6 +28,7 @@
     "android",
     "ios",
     "dist",
-    "scripts"
+    "scripts",
+    "rules"
   ]
 }

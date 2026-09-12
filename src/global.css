@@ -1,9 +1,271 @@
 /* Tailwind v4 is CSS-first — there is deliberately no tailwind.config.js.
    Order matters: tailwind, then uniwind's native variants, then HeroUI's styles. */
-@import 'tailwindcss';
-@import 'uniwind';
-@import 'heroui-native/styles';
+@import "tailwindcss";
+@import "uniwind";
+@import "heroui-native/styles";
 
 /* Tailwind's @source is resolved relative to THIS file, hence the `../`.
    Without it HeroUI's own classes get purged and its components render unstyled. */
 @source '../node_modules/heroui-native/lib';
+
+/*
+ * Flushy Flash theme — HeroUI Native (glass), campus mint/teal at hue 164.26.
+ *
+ * ## Read this before changing a colour
+ *
+ * Set the BARE tokens below (`--surface`, `--accent`, `--field-background`).
+ * Never set `--color-*` directly: heroui-native/styles/theme.css derives every
+ * `--color-*`, `--radius-*`, `--shadow-*` and all the `color-mix()` variants
+ * (`--color-accent-soft`, `--color-border-secondary`, hover states…) from these.
+ * Writing `--color-surface` yourself bypasses that whole layer.
+ *
+ * ## Why `@variant light/dark` and not `.light, [data-theme="light"]`
+ *
+ * uniwind declares `@custom-variant dark { &:where(.dark, .dark *) … }` in
+ * node_modules/uniwind/uniwind.css. `@variant` is the idiom heroui-native
+ * itself uses in variables.css, and it additionally picks up the
+ * `prefers-color-scheme` arm that bare class selectors miss. Attribute
+ * selectors like `[data-theme="dark"]` are web-HeroUI and inert on native.
+ *
+ * This block is deliberately UNLAYERED: heroui-native declares its tokens
+ * inside `@layer theme`, and unlayered CSS wins over any layer regardless of
+ * specificity or source order.
+ */
+
+@theme inline static {
+  /* Switches every HeroUI Background part (Surface, Card, Input, Dialog,
+     Popover, Menu, BottomSheet, Select, Toast, Alert…) to mount a GlassView.
+     Read at runtime by useLibraryTheme() -> useCSSVariable('--theme'), which is
+     why `static` is required: no className ever references it, so Tailwind
+     would otherwise tree-shake it away.
+
+     iOS gets a real expo-blur BlurView. Android and web get an OPAQUE
+     fallback — see src/components/glass-surface.tsx for how that is handled. */
+  --theme: glass;
+
+  /* HeroUI ships 0px field borders. Glass needs an edge to read as a surface.
+     NOTE: this lands on iOS only. Input's base class string carries
+     `android:border-transparent` (input.styles.js), which wins over
+     `.input__input`'s border-color on Android. The Android field reads via its
+     background tint instead. */
+  --field-border-width: 1px;
+
+  /* Tokens this app owns; heroui-native has no equivalent. Resolved per scheme
+     in the :root block below. */
+  /* White, for glyphs sitting ON --accent (the active tab circle, the centre
+   * action). Now numerically identical to --accent-foreground, and kept only
+   * because the two carry different INTENT: --accent-foreground is whatever
+   * heroui paints on an accent fill, --on-accent is what this app paints on one
+   * it drew itself. If they ever need to diverge, this is the seam.
+   *
+   * The old "icons only, 3.056:1, never a text label" warning is gone with the
+   * darker accent: white now measures 4.65:1, so a label is fine. */
+  /* Second deliberate --color-* override, same leaf rule as
+   * --color-accent-soft-foreground below: theme.css:67 is its only definition
+   * and nothing derives from it, so no color-mix() chain is orphaned. See the
+   * --accent-hover note in each scheme for why the derived value is unusable. */
+  /* The loading screen's ground, and an ALIAS of --background rather than a
+   * colour of its own. Two seams depend on it matching: app.json's splash
+   * backgroundColor hands over to it (native -> JS), and it fades out to reveal
+   * the app (JS -> app). A third independent value would drift against both.
+   * app.json carries the resolved sRGB — see the note beside each scheme. */
+  --color-splash-ground: var(--background);
+  --color-accent-hover: var(--accent-hover);
+  --color-on-accent: var(--on-accent);
+  --color-on-brand: var(--on-brand);
+  --color-brand-grad-from: var(--brand-grad-from);
+  --color-brand-grad-via: var(--brand-grad-via);
+  --color-brand-grad-to: var(--brand-grad-to);
+  --color-brand-grad-anchor: var(--brand-grad-anchor);
+
+  /* The ONE deliberate exception to "never set --color-*" above.
+   *
+   * heroui derives this as color-mix(in oklab, accent 80%, foreground 20%) and
+   * uses it for the secondary Button label (button.css), Alert, Avatar fallback,
+   * Chip, TagGroup and Toast. Two problems:
+   *
+   *   1. Uniwind evaluates color-mix in sRGB, not oklab - native-utils.ts ends
+   *      in formatHex(interpolate([mix, color])(w)) and culori's interpolate
+   *      defaults to rgb - so the `in oklab` never happens at runtime.
+   *   2. Mixed 80/20 with a mid-tone brand, the result lands too close to the
+   *      --default fill it sits on. Measured on this app's secondary buttons:
+   *      3.37:1 light and 3.99:1 dark, both under AA, across 11 call sites.
+   *
+   * Overriding is safe here in a way that writing --color-surface would not be:
+   * this token is a LEAF. Eight component stylesheets read it and nothing
+   * derives from it, so no color-mix chain is orphaned. Our @theme block is
+   * imported after heroui-native/styles, so this wins. */
+  --color-accent-soft-foreground: var(--accent-soft-fg);
+}
+
+:root {
+  /* Shared across both schemes. */
+  --radius: 0.5rem;
+  --field-radius: 0.75rem;
+
+  @variant light {
+    /* Base. --background MUST stay opaque: GlassView's
+       flattenColorOverBackground() uses it as the compositing backdrop, and
+       alpha there produces wrong colours in the Android fallback. */
+    /* #F4F6F5 — mirrored by app.json's splash backgroundColor. */
+    --background: oklch(97.02% 0.0024 164.26);
+    --foreground: oklch(21.03% 0.0024 164.26);
+
+    /* Surfaces carry alpha — that is the whole glass trick. The surface root
+       paints --color-surface and GlassView sits above it, so an opaque token
+       here would leave nothing to see through. */
+    --surface: oklch(99.5% 0.004 164.26 / 82%);
+    --surface-foreground: oklch(21.03% 0.0024 164.26);
+    --surface-secondary: oklch(98% 0.006 164.26 / 66%);
+    --surface-secondary-foreground: oklch(21.03% 0.0024 164.26);
+    --surface-tertiary: oklch(95% 0.008 164.26 / 60%);
+    --surface-tertiary-foreground: oklch(21.03% 0.0024 164.26);
+
+    /* Overlays stay near-opaque on purpose: a see-through dialog over the map
+       is unreadable, and these deliberately keep HeroUI's Android fallback. */
+    --overlay: oklch(99.5% 0.004 164.26 / 88%);
+    --overlay-foreground: oklch(21.03% 0.0024 164.26);
+
+    --accent: oklch(54.5% 0.118 164.26);
+    --accent-foreground: oklch(100% 0 0);
+    /* The PRESS state, and it must be set by hand. heroui derives
+       --color-accent-hover as color-mix(accent 90%, accent-foreground 10%);
+       now that the foreground is white that mix LIGHTENS to #1A916E, where the
+       white label measures 3.95:1 — the button would fail AA precisely while
+       being pressed. Darkening instead keeps it at 6.13:1. */
+    --accent-hover: oklch(48% 0.110 164.26);
+
+    --default: oklch(92% 0.014 164.26 / 72%);
+    --default-foreground: oklch(21.03% 0.0059 164.26);
+
+    /* Opaque: text colours with alpha stack unpredictably over a gradient and
+       make contrast unverifiable.
+
+       These are darker than they look like they need to be, and the reason is
+       not the resting layout. layouts/screen.tsx mounts the backdrop OUTSIDE
+       the ScrollView, so the gradient is fixed while the card scrolls - and
+       with the keyboard open the card can be dragged over the gradient's
+       darkest point. Every card-borne colour is therefore tuned against the
+       card composited over --brand-grad-anchor (#cee3dd), not over the pale
+       end it appears to sit on. --danger measures 4.03 at 55% there and 4.94
+       at 50%; --link 4.57 at 48% and 5.46 at 44%. */
+    --muted: oklch(47% 0.014 164.26);
+
+    /* A DARK tint, not translucent white. Translucent white over an 82%-white
+       card measures ~1.06:1 — the field vanishes. A low-alpha dark tint reads
+       as a well and keeps text contrast high. */
+    --field-background: oklch(42% 0.05 164.26 / 14%);
+    --field-foreground: oklch(21.03% 0.0024 164.26);
+    --field-placeholder: oklch(44% 0.014 164.26);
+    --field-border: oklch(42% 0.05 164.26 / 45%);
+
+    --border: oklch(42% 0.04 164.26 / 20%);
+    --separator: oklch(42% 0.03 164.26 / 16%);
+    --focus: oklch(64.78% 0.1376 164.26);
+
+    /* The accent is unreadable as text on the card (3.06:1). Links need their
+       own, darker token - this is ~#00775A at 5.38:1. */
+    --link: oklch(44% 0.1 164.26);
+    --accent-soft-fg: oklch(45% 0.115 164.26);
+
+    --segment: oklch(99.5% 0.004 164.26 / 80%);
+    --segment-foreground: oklch(21.03% 0.0024 164.26);
+
+    --success: oklch(58% 0.15 150);
+    --success-foreground: oklch(99.11% 0 0);
+    --warning: oklch(68% 0.15 62);
+    --warning-foreground: oklch(21.03% 0.0059 61.72);
+    --danger: oklch(50% 0.19 25);
+    --danger-foreground: oklch(99.11% 0 0);
+
+    --surface-shadow: 0px 2px 12px oklch(30% 0.03 164.26 / 8%);
+    --overlay-shadow: 0px 8px 28px oklch(30% 0.03 164.26 / 14%);
+
+    /* Brand gradient: deep at the top, pale at the bottom, so the headline sits
+       over the deep end in --on-brand and the glass card sits over the pale end
+       where --muted and --danger still clear AA.
+
+       `from`/`via`/`to` are the brand ramp exactly as specified: #008F6A ->
+       #00C98B -> #5BE7B2. `anchor` (#00694C) is NOT part of that ramp - it
+       exists only under the auth header, because the specified ramp is stuck in
+       the middle of the lightness scale: on #008F6A white measures 4.09:1 and
+       near-black 4.00:1, so NEITHER passes AA. White on the anchor is 6.72:1.
+       Decorative uses of the gradient take the three stops without it. */
+    --on-accent: oklch(100% 0 0);
+    --on-brand: oklch(99.5% 0.01 172);
+    --brand-grad-anchor: oklch(46.18% 0.0958 166.02);
+    --brand-grad-from: oklch(57.67% 0.1186 166.75);
+    --brand-grad-via: oklch(73.89% 0.1615 162.24);
+    --brand-grad-to: oklch(83.77% 0.1437 164.81);
+  }
+
+  @variant dark {
+    /* #050606 — mirrored by app.json's splash dark.backgroundColor. */
+    --background: oklch(12% 0.0024 164.26);
+    --foreground: oklch(99.11% 0.0024 164.26);
+
+    --surface: oklch(32.5% 0.018 164.26 / 55%);
+    --surface-foreground: oklch(99.11% 0.0024 164.26);
+    --surface-secondary: oklch(36% 0.018 164.26 / 50%);
+    --surface-secondary-foreground: oklch(99.11% 0.0024 164.26);
+    --surface-tertiary: oklch(40% 0.018 164.26 / 46%);
+    --surface-tertiary-foreground: oklch(99.11% 0.0024 164.26);
+
+    --overlay: oklch(26% 0.012 164.26 / 88%);
+    --overlay-foreground: oklch(99.11% 0.0024 164.26);
+
+    --accent: oklch(54.5% 0.118 164.26);
+    --accent-foreground: oklch(100% 0 0);
+    /* The PRESS state, and it must be set by hand. heroui derives
+       --color-accent-hover as color-mix(accent 90%, accent-foreground 10%);
+       now that the foreground is white that mix LIGHTENS to #1A916E, where the
+       white label measures 3.95:1 — the button would fail AA precisely while
+       being pressed. Darkening instead keeps it at 6.13:1. */
+    --accent-hover: oklch(48% 0.110 164.26);
+
+    --default: oklch(40% 0.014 164.26 / 58%);
+    --default-foreground: oklch(99.11% 0 0);
+
+    --muted: oklch(75.5% 0.014 164.26);
+
+    --field-background: oklch(10% 0.02 175 / 40%);
+    --field-foreground: oklch(99.11% 0.0024 164.26);
+    --field-placeholder: oklch(71% 0.012 164.26);
+    --field-border: oklch(88% 0.02 164.26 / 26%);
+
+    --border: oklch(88% 0.02 164.26 / 18%);
+    --separator: oklch(90% 0.02 164.26 / 14%);
+    --focus: oklch(64.78% 0.1376 164.26);
+
+    --link: oklch(84% 0.13 164.26);
+    --accent-soft-fg: oklch(80% 0.14 164.26);
+
+    --segment: oklch(40% 0.018 164.26 / 70%);
+    --segment-foreground: oklch(99.11% 0.0024 164.26);
+
+    --success: oklch(73.29% 0.1944 140.2);
+    --success-foreground: oklch(21.03% 0.0059 140.2);
+    --warning: oklch(82.03% 0.1395 65.73);
+    --warning-foreground: oklch(21.03% 0.0059 65.73);
+    --danger: oklch(78% 0.15 20);
+    --danger-foreground: oklch(15% 0.02 20);
+
+    --surface-shadow: 0px 2px 12px oklch(0% 0 0 / 32%);
+    --overlay-shadow: 0px 8px 28px oklch(0% 0 0 / 46%);
+
+    /* Dark has no ramp of its own in the brand spec, so this is constructed.
+       It runs the OPPOSITE way to light - deep at the top for the header, then
+       DARKER toward the bottom - and that direction is load-bearing, not
+       aesthetic. The glass card is only 55% opaque, so it takes its colour from
+       whatever it sits on: over a light stop the card lifts to ~#185845 and
+       --muted drops to 3.82:1 and --danger to 3.11:1, both failing AA. Over
+       this ramp the card lands near #192722 and they measure 7.11 and 5.79.
+       White on the anchor is 8.74:1. */
+    --on-accent: oklch(100% 0 0);
+    --on-brand: oklch(99.5% 0.01 172);
+    --brand-grad-anchor: oklch(40.22% 0.0821 167.28);
+    --brand-grad-from: oklch(32% 0.068 168);
+    --brand-grad-via: oklch(23% 0.048 170);
+    --brand-grad-to: oklch(17% 0.03 172);
+  }
+}

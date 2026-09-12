@@ -4,6 +4,8 @@
  * rather than estimated — see the notes on each constant.
  */
 
+import { env } from '@/lib/env';
+
 export type LatLng = { lat: number; lng: number };
 
 /**
@@ -47,9 +49,8 @@ export const MAX_ZOOM = 19;
  */
 export const CLSU_EMAIL_DOMAIN = 'clsu.edu.ph';
 
-/** Free, keyless, OSM-based vector tiles. Overridable for MapTiler etc. */
-export const MAP_STYLE_URL =
-  process.env.EXPO_PUBLIC_MAP_STYLE_URL ?? 'https://tiles.openfreemap.org/styles/liberty';
+/** Free, keyless, OSM-based vector tiles. Configured in src/lib/env.ts. */
+export const MAP_STYLE_URL = env.mapStyleUrl;
 
 /** Overpass bbox string (S,W,N,E) used by scripts/seed-buildings.ts. */
 export const CAMPUS_BBOX = [

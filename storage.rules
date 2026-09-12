@@ -31,7 +31,9 @@ service firebase.storage {
     }
 
     match /restrooms/{restroomId}/{photoId} {
-      allow read: if isSignedIn();
+      // Public, matching the restroom documents these belong to — a guest
+      // browsing the map sees the photos too.
+      allow read: if true;
       allow create: if isSignedIn() && isImage() && withinSizeLimit() && declaresUploader();
       // Photos are immutable: replacing bytes behind an existing URL would let
       // someone swap approved content for something else after the fact.
@@ -41,7 +43,9 @@ service firebase.storage {
     }
 
     match /users/{uid}/avatar/{avatarId} {
-      allow read: if isSignedIn();
+      // Public, matching users/{uid} in firestore.rules: avatars appear beside
+      // review authors, and reviews are readable by guests.
+      allow read: if true;
       allow create: if isSignedIn()
         && request.auth.uid == uid
         && isImage()

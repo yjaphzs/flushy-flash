@@ -1,57 +1,112 @@
 import { useState } from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
-import { Button } from '@/components/button';
-import { ScreenScrollView } from '@/components/screen';
-import { Text } from '@/components/text';
-import { TextField, TextFieldError, TextFieldInput, TextFieldLabel } from '@/components/text-field';
+import { Button } from '@/components/ui/button';
+import { EmailAddress } from '@/components/common/email-text';
+import { Callout } from '@/components/feedback/callout';
+import { Field } from '@/components/forms/field';
+import { ScreenScrollView } from '@/components/layouts/screen';
+import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
 import { resetPassword } from '@/features/auth/api';
+import { authErrorMessage, isAccountNotFound, isEmailish } from '@/features/auth/errors';
+import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
 
+/**
+ * Presented as a form sheet, so no gradient here — the sheet has its own
+ * material and sign-in stays visible behind it.
+ */
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const params = useLocalSearchParams<{ email?: string }>();
+  const [email, setEmail] = useState(params.email ?? '');
   const [sent, setSent] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const ready = isEmailish(email);
+
   async function onSubmit() {
+    if (!ready || busy) return;
     setBusy(true);
-    setError(null);
+    setFormError(null);
     try {
       await resetPassword(email);
       setSent(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send the reset email.');
+      // A missing account is routed into the SUCCESS state on purpose. Showing
+      // "no account for that email" would turn this screen into an account
+      // enumeration oracle, which the neutral copy below exists to avoid.
+      if (isAccountNotFound(e)) {
+        setSent(true);
+      } else {
+        setFormError(authErrorMessage(e, 'reset'));
+      }
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <ScreenScrollView contentContainerClassName="px-5 pt-8 gap-5">
+    <ScreenScrollView contentContainerClassName="gap-5 px-5 py-6" avoidsKeyboard>
       {sent ? (
         <>
-          <Text className="text-xl font-semibold">Check your inbox</Text>
-          <Text className="text-muted-foreground">
-            If an account exists for {email}, a reset link is on its way.
-          </Text>
-          <Button onPress={() => router.back()}>
+          <View className="gap-1">
+            <Text type="h3" accessibilityRole="header">
+              Check your inbox
+            </Text>
+            <Text type="body-sm" color="muted">
+              If an account exists for <EmailAddress email={email} />, a reset link is on its
+              way.
+            </Text>
+          </View>
+          <Button size="lg" className="rounded-full" onPress={() => router.back()}>
             <Button.Label>Done</Button.Label>
           </Button>
         </>
       ) : (
         <>
-          <TextField>
-            <TextFieldLabel>Email</TextFieldLabel>
-            <TextFieldInput
+          <View className="gap-1">
+            <Text type="h3" accessibilityRole="header">
+              Reset your password
+            </Text>
+            <Text type="body-sm" color="muted">
+              We&apos;ll email you a link to set a new one.
+            </Text>
+          </View>
+
+          {formError ? (
+            <Callout tone="danger" testID="reset-error">
+              <Text type="body-sm">{formError}</Text>
+            </Callout>
+          ) : null}
+
+          <Field>
+            <Field.Label>Email</Field.Label>
+            <Field.Input
               value={email}
               onChangeText={setEmail}
-              autoCapitalize="none"
+              leading="mail"
+              placeholder={`you@${CLSU_EMAIL_DOMAIN}`}
               keyboardType="email-address"
-              placeholder="you@clsu.edu.ph"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="go"
+              submitBehavior="blurAndSubmit"
+              onSubmitEditing={onSubmit}
+              testID="reset-email"
             />
-            {error ? <TextFieldError>{error}</TextFieldError> : null}
-          </TextField>
-          <Button onPress={onSubmit} isDisabled={busy || !email}>
+          </Field>
+
+          <Button
+            size="lg"
+            className="rounded-full"
+            onPress={onSubmit}
+            isDisabled={busy || !ready}
+          >
+            {busy ? <Spinner size="sm" /> : null}
             <Button.Label>{busy ? 'Sending…' : 'Send reset link'}</Button.Label>
           </Button>
         </>

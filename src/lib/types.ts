@@ -33,11 +33,41 @@ export type Amenities = {
 
 export type Restroom = {
   id: string;
-  buildingId: string;
+  /**
+   * Where the pin sits, placed by hand on the map when submitting.
+   *
+   * This reverses an earlier decision that restrooms carried no geometry, whose
+   * reasoning was that indoor GPS is floor-blind. That is still true — which is
+   * exactly why this is a PLACED point rather than a captured fix. A person
+   * standing at the door knows where the door is; the phone does not.
+   * `firestore.rules` clamps it to the campus bounding box.
+   */
+  location: GeoPoint;
+  /**
+   * The seeded OSM building this sits in, when there is one. Suggested from the
+   * pin and editable.
+   *
+   * Nullable, because the pin is now the source of truth for WHERE: a restroom
+   * beside the lagoon, or in a structure OSM never mapped, is still a real
+   * restroom. Buildings are a label now, not a container.
+   */
+  buildingId: string | null;
   /** Ground floor is 1, matching PH convention. */
   floor: number;
+  /** The nearest thing a stranger would recognise, e.g. "CLSU Lagoon". */
+  landmark: string;
   /** "Near the east stairwell" — how people actually find it indoors. */
   locationNote: string;
+  /**
+   * Storage object paths under `restrooms/{id}/`, max 6 — NOT download URLs,
+   * which expire and would bloat the document.
+   *
+   * Deliberately a client-written list rather than the `photoCount` beside it:
+   * that aggregate is pinned to 0 by the rules and can only ever be moved by a
+   * Cloud Function, which this project does not have. Anything showing a count
+   * reads `photoIds.length`.
+   */
+  photoIds: string[];
   amenities: Amenities;
   status: RestroomStatus;
   /** Aggregates: readable by all, writable by none (see firestore.rules). */
@@ -79,7 +109,31 @@ export type UserProfile = {
   createdAt: Timestamp;
 };
 
-/** Live, ephemeral status. Realtime Database, not Firestore. */
+/**
+ * A saved restroom. Composite id `${uid}_${restroomId}` makes "one like per user
+ * per restroom" structural rather than something a query has to police.
+ *
+ * Owner-scoped in firestore.rules, unlike restrooms and reviews: what a person
+ * saved is behavioural data with no public purpose. There is deliberately no
+ * public `likeCount` on Restroom either — that would need both a server-
+ * maintained counter and an open read rule.
+ */
+export type Like = {
+  id: string;
+  userId: string;
+  restroomId: string;
+  createdAt: Timestamp;
+};
+
+/**
+ * Live, ephemeral status. Realtime Database, not Firestore.
+ *
+ * Unused so far, and kept deliberately rather than swept up with the other dead
+ * types: `rtdb` is already initialised in lib/firebase.ts and AGENTS.md lists
+ * live status as a roadmap item, so this is the recorded SHAPE of a planned
+ * feature, not leftover scaffolding. Deleting it would throw away the design and
+ * keep the wiring.
+ */
 export type LiveReport = {
   restroomId: string;
   status: RestroomStatus;
@@ -88,9 +142,3 @@ export type LiveReport = {
   reportedAt: number;
 };
 
-/** A restroom joined to its building — what list and map screens actually render. */
-export type RestroomWithBuilding = Restroom & {
-  building: Pick<Building, 'id' | 'name' | 'code'>;
-  /** Metres from the user's last fix; null when location is unavailable. */
-  distanceM: number | null;
-};

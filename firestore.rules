@@ -3,11 +3,19 @@ rules_version = '2';
 // Flushy Flash - CLSU campus restroom finder.
 //
 // Design notes that matter when editing this file:
+//  * PUBLIC READ, AUTHENTICATED WRITE. buildings, restrooms, reviews, users and
+//    likes are world-readable so a guest opens straight onto a working map.
+//    follows stays signed-in-only, and users/{uid}/private stays self-only -
+//    that subcollection is where anything personal belongs.
+//  * Writing needs more than an account: hasProfile() requires users/{uid} to
+//    exist, so a half-finished signup (verified but no handle yet) cannot write.
+//    This mirrors the client's canWrite selector, server-side.
 //  * Aggregates (ratingSum/ratingCount/photoCount) and social counters are NEVER
 //    client-writable. A Cloud Function can take them over later; until then the
-//    app reads live averages via getAggregateFromServer().
-//  * Reviews use a composite id of restroomId + "_" + uid, so "one review per
-//    user per restroom" is enforced structurally - no query, no race.
+//    app reads live averages via getAggregateFromServer(). Likes follow the same
+//    rule - there is no likeCount field, only getCountFromServer().
+//  * Composite ids enforce "one per user" structurally - no query, no race:
+//    reviews are restroomId + "_" + uid; likes and follows put the actor first.
 //  * hasOnly() locks every document shape. A new field added to the app without
 //    being added here is REJECTED, which is the intended failure direction.
 
@@ -25,7 +33,9 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.admin == true;
+      // .get() with a default, not .admin: reading a claim that is absent is an
+      // evaluation error in rules, not false. Most users have no admin claim.
+      return isSignedIn() && request.auth.token.get('admin', false) == true;
     }
 
     // The verified-student badge is derived from the token itself, never from a
@@ -35,6 +45,15 @@ service cloud.firestore {
         && request.auth.token.email_verified == true
         && request.auth.token.email is string
         && request.auth.token.email.lower().matches('^[^@]+@clsu[.]edu[.]ph$');
+    }
+
+    // Signing in is no longer enough to write. Guests browse freely, and an
+    // account only becomes usable once onboarding has written its profile — so
+    // every write checks that the profile actually exists rather than trusting
+    // the client's own canWrite selector. Costs one document read per write.
+    function hasProfile() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
 
     function incoming() { return request.resource.data; }
@@ -49,14 +68,48 @@ service cloud.firestore {
     }
 
     function restroomKeys() {
-      return ['buildingId', 'floor', 'locationNote', 'amenities', 'status',
+      return ['location', 'buildingId', 'floor', 'landmark', 'locationNote',
+              'photoIds', 'amenities', 'status',
               'ratingSum', 'ratingCount', 'photoCount', 'verified',
               'createdBy', 'createdAt', 'updatedAt'];
+    }
+
+    // Mirrors CAMPUS_BOUNDS in src/lib/campus.ts and isOnCampus() in
+    // src/lib/geo.ts. A pin is placed by hand, so unlike the admin-seeded
+    // buildings it is attacker-controlled: without this, "add a restroom"
+    // writes an arbitrary point anywhere on Earth into a public collection.
+    // Keep the two copies in step — there is no import across this boundary.
+    // NB: latitude()/longitude() are METHODS on the rules `latlng` type, not
+    // properties. Writing `point.latitude` is parsed as a map key lookup and
+    // fails with "Received: [latlng] Expected: [map,path]" — which reads like a
+    // problem with the value, not with the access.
+    function isOnCampus(point) {
+      return point is latlng
+        && point.latitude() >= 15.7256536 && point.latitude() <= 15.744753
+        && point.longitude() >= 120.9214497 && point.longitude() <= 120.9540707;
+    }
+
+    // Storage object paths under restrooms/{id}/, not download URLs.
+    //
+    // FIVE, and shared by restrooms AND reviews — reviews used to carry their
+    // own inline `size() <= 6`, which is exactly how two caps that are meant to
+    // be the same drift apart. Mirrored by MAX_PHOTOS in
+    // src/features/restrooms/photos.ts; this copy is the one that enforces.
+    //
+    // The number is a storage decision, not a UI one: every object here is
+    // world-readable and immutable by rule, so this ceiling is what bounds how
+    // large the bucket can get.
+    function isValidPhotoIds(ids) {
+      return ids is list && ids.size() <= 5;
     }
 
     function reviewKeys() {
       return ['restroomId', 'buildingId', 'authorId', 'rating', 'cleanliness',
               'text', 'photoIds', 'createdAt', 'updatedAt'];
+    }
+
+    function likeKeys() {
+      return ['userId', 'restroomId', 'createdAt'];
     }
 
     function userKeys() {
@@ -69,7 +122,9 @@ service cloud.firestore {
     // buildings, so there is no reason to expose writes here.
 
     match /buildings/{buildingId} {
-      allow read: if isSignedIn();
+      // Public: a guest opens the app straight onto the map, so the pins have to
+      // load before there is any account.
+      allow read: if true;
       allow create, update: if isAdmin()
         && incoming().keys().hasOnly(['name', 'code', 'aliases', 'location',
                                       'osmId', 'restroomCount', 'createdAt'])
@@ -83,30 +138,45 @@ service cloud.firestore {
     // ---------- restrooms ----------
 
     match /restrooms/{restroomId} {
-      allow read: if isSignedIn();
+      allow read: if true;
 
-      allow create: if isSignedIn()
+      allow create: if hasProfile()
         && incoming().keys().hasOnly(restroomKeys())
         && incoming().createdBy == request.auth.uid
-        && incoming().buildingId is string
-        && exists(/databases/$(database)/documents/buildings/$(incoming().buildingId))
+        // The pin is the source of truth for WHERE, so it is required and
+        // bounded. hasOnly() permits a subset, so without this clause a create
+        // omitting location would pass.
+        && isOnCampus(incoming().location)
+        // Nullable now: a restroom beside the lagoon belongs to no building.
+        // When named, the building must exist — a dangling id would render as
+        // "Unknown building" forever.
+        && (incoming().buildingId == null
+            || (incoming().buildingId is string
+                && exists(/databases/$(database)/documents/buildings/$(incoming().buildingId))))
         && incoming().floor is int
         && incoming().floor >= -5 && incoming().floor <= 50
+        && incoming().landmark is string
+        && incoming().landmark.size() <= 80
         && incoming().locationNote is string
         && incoming().locationNote.size() <= 200
+        && isValidPhotoIds(incoming().photoIds)
         && incoming().status in ['ok', 'out_of_order', 'closed']
         && incoming().ratingSum == 0
         && incoming().ratingCount == 0
         && incoming().photoCount == 0
         && incoming().verified == false;
 
-      allow update: if isSignedIn()
+      allow update: if hasProfile()
         && (isSelf(current().createdBy) || isVerifiedStudent() || isAdmin())
         && unchanged(['ratingSum', 'ratingCount', 'photoCount', 'createdBy', 'createdAt'])
         && incoming().keys().hasOnly(restroomKeys())
         && incoming().status in ['ok', 'out_of_order', 'closed']
+        && isOnCampus(incoming().location)
+        && incoming().landmark is string
+        && incoming().landmark.size() <= 80
         && incoming().locationNote is string
         && incoming().locationNote.size() <= 200
+        && isValidPhotoIds(incoming().photoIds)
         && (unchanged(['verified']) || isVerifiedStudent() || isAdmin());
 
       // Narrow on purpose: only the author, and only before anyone else has
@@ -121,9 +191,9 @@ service cloud.firestore {
     // Document id MUST be restroomId + "_" + uid.
 
     match /reviews/{reviewId} {
-      allow read: if isSignedIn();
+      allow read: if true;
 
-      allow create: if isSignedIn()
+      allow create: if hasProfile()
         && reviewId == incoming().restroomId + '_' + request.auth.uid
         && incoming().authorId == request.auth.uid
         && incoming().keys().hasOnly(reviewKeys())
@@ -131,8 +201,7 @@ service cloud.firestore {
         && isValidScore(incoming().cleanliness)
         && incoming().text is string
         && incoming().text.size() <= 2000
-        && incoming().photoIds is list
-        && incoming().photoIds.size() <= 6
+        && isValidPhotoIds(incoming().photoIds)
         && exists(/databases/$(database)/documents/restrooms/$(incoming().restroomId));
 
       allow update: if isSelf(current().authorId)
@@ -149,7 +218,11 @@ service cloud.firestore {
     // ---------- users ----------
 
     match /users/{uid} {
-      allow read: if isSignedIn();
+      // Public: reviews render their author's name and handle, and a guest can
+      // read reviews. Safe because this document is the PUBLIC profile — only
+      // handle, displayName, photoURL, the badge and three counters. Anything
+      // personal belongs in users/{uid}/private below, which stays self-only.
+      allow read: if true;
 
       allow create: if isSelf(uid)
         && incoming().keys().hasOnly(userKeys())
@@ -194,9 +267,44 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- likes ----------
+    // Document id MUST be uid + "_" + restroomId, which is what makes "one like
+    // per user per restroom" structural — no query, no race, same trick reviews
+    // and follows already use. Note the actor comes first here, matching
+    // follows, so a user's own likes read naturally.
+    //
+    // There is deliberately no likeCount on the restroom: that would be a
+    // client-writable aggregate. Counts are read live with getCountFromServer.
+
+    match /likes/{likeId} {
+      // Owner-scoped, NOT public — unlike restrooms and reviews. What a person
+      // saved is behavioural data about them, and it has no public purpose: the
+      // Likes tab only ever queries `where userId == uid`, which this satisfies.
+      // Same reasoning that keeps follows gated below.
+      //
+      // The corollary is that there is no public "saved by N students" count.
+      // That is a deliberate omission, not an oversight — adding one later means
+      // a server-maintained counter, not opening this rule.
+      allow read: if isSelf(current().userId);
+
+      allow create: if hasProfile()
+        && likeId == request.auth.uid + '_' + incoming().restroomId
+        && incoming().keys().hasOnly(likeKeys())
+        && incoming().userId == request.auth.uid
+        && incoming().restroomId is string
+        && exists(/databases/$(database)/documents/restrooms/$(incoming().restroomId));
+
+      // A like has no mutable state. Unliking is a delete, which is what keeps
+      // the composite-id uniqueness argument intact.
+      allow update: if false;
+      allow delete: if isSelf(current().userId) || isAdmin();
+    }
+
     // ---------- follows ----------
 
     match /follows/{followId} {
+      // Still gated: the social graph is not public, unlike restrooms and
+      // reviews. Who follows whom is nobody else's business.
       allow read: if isSignedIn();
       allow create: if isSignedIn()
         && followId == request.auth.uid + '_' + incoming().followeeId

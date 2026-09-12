@@ -1,7 +1,7 @@
 import { Link, Stack } from 'expo-router';
 
-import { ScreenScrollView } from '@/components/screen';
-import { Text } from '@/components/text';
+import { ScreenScrollView } from '@/components/layouts/screen';
+import { Text } from '@/components/ui/text';
 
 export default function NotFoundScreen() {
   return (
@@ -10,7 +10,7 @@ export default function NotFoundScreen() {
       <ScreenScrollView contentContainerClassName="px-5 py-24 gap-3 items-center">
         <Text className="text-lg font-semibold">This screen does not exist.</Text>
         <Link href="/">
-          <Text className="text-primary">Go to the map</Text>
+          <Text className="text-link">Go to the map</Text>
         </Link>
       </ScreenScrollView>
     </>

@@ -23,6 +23,14 @@ Nine skills are committed under `.agents/skills/` and tracked in
 | `vercel-react-native-skills` | Performance: list virtualisation, Reanimated, native modules |
 | `vercel-composition-patterns` | Designing component APIs (compound components) |
 | `expo-design-system` / `expo-project-structure` | Design tokens and file placement |
+| `flushy-flash-git` | **Project-specific.** Committing, branching, releases, and what must never be committed |
+| `git-commit-workflow` | General conventional-commit guidance (third-party) |
+
+**Where `flushy-flash-git` and `git-commit-workflow` disagree, the project skill
+wins** — it knows this repo's CI, secrets and release mechanics. Two known
+frictions in the third-party skill: it mandates issue linking on every commit
+(this repo does not run an issue-first process), and it references `gh` plus
+sibling commands from its own plugin that are not installed here.
 
 Skills deliberately **not** installed, because they contradict this stack:
 `callstack/react-navigation` (teaches the banned navigators), `expo-native-ui` and

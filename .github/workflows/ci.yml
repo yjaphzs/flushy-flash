@@ -1,0 +1,111 @@
+name: ci
+
+# The PR gate. Deliberately mirrors the verification block in AGENTS.md section 9
+# so local checks and CI cannot drift apart.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same PR cancels the previous run rather than queueing.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: typecheck, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 so the docs-only diff below has history to compare
+      # against. A shallow clone cannot see the base commit.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Skip the expensive steps for a documentation-only change — but keep the
+      # JOB running, which is the whole point.
+      #
+      # `paths-ignore:` at the `on:` level would be the obvious way to do this
+      # and it is a trap: GitHub then does not start the workflow at all, so a
+      # REQUIRED status check never reports. `main` is protected and CI must
+      # pass (AGENTS.md section 10), so a docs-only PR would sit on "Expected —
+      # waiting for status to be reported" and could never merge.
+      #
+      # Gating the steps instead costs one runner spin-up (~10s) and always
+      # reports green. firebase-rules.yml and native-check.yml use `paths:`
+      # safely because neither is a required check.
+      - name: Detect documentation-only changes
+        id: filter
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+
+          # A new branch or a force-push reports an all-zero base. There is
+          # nothing to diff against, so run everything rather than guess.
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "Base unavailable — running the full suite."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$base" HEAD)
+          echo "Changed files:"
+          echo "$changed"
+
+          # Anything NOT matching a documentation path means real work.
+          # -v inverts, -E is a POSIX ERE, and `|| true` keeps a zero match from
+          # failing the step under `set -e`.
+          code=$(printf '%s\n' "$changed" \
+            | grep -Ev '(^|/)[^/]+\.md$|^LICENSE$|^docs/|^\.github/ISSUE_TEMPLATE/' \
+            || true)
+
+          if [ -z "$code" ]; then
+            echo "Documentation only — skipping typecheck, lint, test and doctor."
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.filter.outputs.code == 'true'
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        if: steps.filter.outputs.code == 'true'
+        run: npm ci
+
+      - name: Typecheck (app)
+        if: steps.filter.outputs.code == 'true'
+        run: npm run typecheck
+
+      # scripts/ is Node, not React Native, and has its own tsconfig. It is
+      # excluded from the app typecheck, so it needs its own pass or it rots.
+      - name: Typecheck (node scripts)
+        if: steps.filter.outputs.code == 'true'
+        run: npx tsc --noEmit -p scripts/tsconfig.json
+
+      # Includes the no-restricted-imports firewall that keeps app code off
+      # react-native / heroui-native / MapLibre directly.
+      - name: Lint
+        if: steps.filter.outputs.code == 'true'
+        run: npm run lint
+
+      - name: Test
+        if: steps.filter.outputs.code == 'true'
+        run: npm test
+
+      # The check that enforces "track the SDK, not npm latest" (AGENTS.md 5).
+      # Without this, dependency drift is invisible until a native build fails.
+      - name: Expo doctor
+        if: steps.filter.outputs.code == 'true'
+        run: npx expo-doctor

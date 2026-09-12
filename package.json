@@ -7,13 +7,20 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "prebuild": "expo prebuild --clean",
+    "prebuild": "node scripts/check-firebase-config.mjs && expo prebuild --clean && node scripts/configure-android-build.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
     "doctor": "npx expo-doctor",
-    "seed:buildings": "tsx scripts/seed-buildings.ts"
+    "seed:buildings": "tsx scripts/seed-buildings.ts",
+    "test:rules": "npx --yes firebase-tools@15.30.0 emulators:exec --only firestore --project flushy-flash-rules-test \"npm --prefix rules test\"",
+    "typecheck:all": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json && npm --prefix rules run typecheck",
+    "prebuild:android": "node scripts/check-firebase-config.mjs --platform android && expo prebuild --platform android --clean && node scripts/configure-android-build.mjs",
+    "firebase:placeholder": "node scripts/make-placeholder-firebase-config.mjs",
+    "firebase:emulators": "npx --yes firebase-tools@15.30.0 emulators:start",
+    "deploy:rules": "npx --yes firebase-tools@15.30.0 deploy --project flushy-flash --only firestore:rules,firestore:indexes,database,storage --non-interactive",
+    "firebase:sdkconfig": "npx --yes firebase-tools@15.30.0 apps:sdkconfig android --project flushy-flash --out google-services.json"
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.14",
@@ -24,6 +31,7 @@
     "@react-native-firebase/database": "26.4.0",
     "@react-native-firebase/firestore": "26.4.0",
     "@react-native-firebase/storage": "26.4.0",
+    "@react-native-google-signin/google-signin": "16.1.5",
     "expo": "57.0.22",
     "expo-blur": "57.0.3",
     "expo-build-properties": "57.0.17",
@@ -31,6 +39,8 @@
     "expo-dev-client": "57.0.19",
     "expo-font": "57.0.4",
     "expo-image": "57.0.5",
+    "expo-image-manipulator": "57.0.17",
+    "expo-image-picker": "57.0.17",
     "expo-linking": "57.0.10",
     "expo-location": "57.0.17",
     "expo-router": "57.0.21",
@@ -38,6 +48,8 @@
     "expo-status-bar": "57.0.1",
     "expo-system-ui": "57.0.4",
     "heroui-native": "1.0.9",
+    "lottie-react-native": "7.3.8",
+    "lucide-react-native": "1.45.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -69,6 +81,21 @@
     "typescript": "6.0.3"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "<rootDir>/node_modules/",
+      "<rootDir>/rules/"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|heroui-native|uniwind|@legendapp/.*|@gorhom/.*|react-native-reanimated|react-native-worklets|@react-native-google-signin/.*|tailwind-variants|tailwind-merge|@maplibre/.*|lottie-react-native))"
+    ],
+    "resolver": "./node_modules/react-native-worklets/jest/resolver.js",
+    "setupFiles": [
+      "./node_modules/react-native-gesture-handler/jestSetup.js",
+      "<rootDir>/jest.setup.js"
+    ],
+    "moduleNameMapper": {
+      "^lucide-react-native/icons/(.*)$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/icons/$1.js"
+    }
   }
 }

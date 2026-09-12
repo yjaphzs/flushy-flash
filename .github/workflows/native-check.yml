@@ -1,0 +1,87 @@
+name: native-check
+
+# Typecheck and lint cannot see native failures. A bad config plugin, a bumped
+# native dependency or a malformed app.json only surfaces at prebuild/gradle time
+# — which would otherwise be the moment you cut a release. This runs that risk
+# early, and only when something native-facing actually changed.
+on:
+  pull_request:
+    paths:
+      - 'app.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'plugins/**'
+      - '.github/workflows/native-check.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: native-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug:
+    name: Prebuild and assemble debug
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - run: npm ci
+
+      # Debug build, so no keystore is needed. A placeholder google-services.json
+      # keeps the Firebase config plugin happy without exposing the real project:
+      # we are checking that the native build wires up, not that it can talk to
+      # Firebase.
+      - name: Write placeholder Firebase config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 -d > google-services.json
+          else
+            echo "No GOOGLE_SERVICES_JSON secret; using a structurally valid placeholder."
+            cat > google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "flushy-flash-placeholder",
+              "storage_bucket": "flushy-flash-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": { "package_name": "xyz.yjaphzs.flushyflash" }
+                },
+                "oauth_client": [],
+                "api_key": [{ "current_key": "AIzaSyPlaceholderPlaceholderPlaceholder00" }],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+          fi
+
+      - name: Prebuild Android
+        run: npx expo prebuild --platform android --clean
+
+      - name: Assemble debug
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon

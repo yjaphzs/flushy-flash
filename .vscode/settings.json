@@ -3,5 +3,7 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
-  }
+  },
+  "//": "Tailwind v4 / uniwind at-rules (@theme, @variant, @source, @custom-variant) are not in VS Code's built-in CSS grammar. Without this, src/global.css shows spurious 'Unknown at rule' warnings.",
+  "css.lint.unknownAtRules": "ignore"
 }
