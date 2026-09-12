@@ -126,7 +126,7 @@ jobs:
           cp "$SRC" "$DEST"
           echo "path=$DEST" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.apk.outputs.path }}
           path: ${{ steps.apk.outputs.path }}
