@@ -60,14 +60,22 @@ export function PhotoStrip({ photoIds }: { photoIds: string[] }) {
       <Text type="body-xs" weight="semibold" color="muted">
         PHOTOS
       </Text>
-      <List
-        data={photoIds}
-        horizontal
-        keyExtractor={(path) => path}
-        estimatedItemSize={SIZE}
-        contentContainerStyle={{ gap: 8 }}
-        renderItem={({ item, index }) => <Photo path={item} index={index} />}
-      />
+      {/*
+        The explicit height is not decoration. This strip's only host is the
+        detail sheet, which sizes itself dynamically against its content — and a
+        horizontal list has no intrinsic height to measure, so without this the
+        sheet computes its height from a zero-height child.
+      */}
+      <View style={{ height: SIZE }}>
+        <List
+          data={photoIds}
+          horizontal
+          keyExtractor={(path) => path}
+          estimatedItemSize={SIZE}
+          contentContainerStyle={{ gap: 8 }}
+          renderItem={({ item, index }) => <Photo path={item} index={index} />}
+        />
+      </View>
     </View>
   );
 }

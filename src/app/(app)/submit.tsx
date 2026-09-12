@@ -95,7 +95,7 @@ export default function SubmitRestroomScreen() {
   const ready = Boolean(point) && landmark.trim().length > 0 && !form.busy;
 
   return (
-    <ScreenScrollView contentContainerClassName="px-5 py-5 gap-6">
+    <ScreenScrollView topInset={false} contentContainerClassName="px-5 py-5 gap-6">
       <View className="gap-2">
         <Text type="h4">Where is it?</Text>
         <PinPicker onChange={setPoint} />

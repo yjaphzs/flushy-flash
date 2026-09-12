@@ -65,7 +65,7 @@ export default function RestroomDetailScreen() {
   // so without this every deep link flashed "no longer listed" first.
   if (!restroom) {
     return (
-      <ScreenScrollView contentContainerClassName="flex-1 items-center justify-center gap-3 px-8">
+      <ScreenScrollView topInset={false} contentContainerClassName="flex-1 items-center justify-center gap-3 px-8">
         {loading ? <Spinner /> : <Text>This restroom is no longer listed.</Text>}
       </ScreenScrollView>
     );
@@ -78,7 +78,7 @@ export default function RestroomDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: building?.name ?? 'Restroom' }} />
-      <ScreenScrollView contentContainerClassName="px-4 py-4 gap-4">
+      <ScreenScrollView topInset={false} contentContainerClassName="px-4 py-4 gap-4">
         <View className="gap-1">
           <Text className="text-2xl font-semibold">
             {restroom.locationNote || `Floor ${restroom.floor}`}

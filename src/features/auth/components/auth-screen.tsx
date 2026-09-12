@@ -47,6 +47,10 @@ export function AuthScreen({ title, subtitle, onBack, children, testID }: AuthSc
       testID={testID}
     >
       {onBack ? (
+        // pt-3 alone put this 12px from the top of the WINDOW on Android — the
+        // (auth) group is a root-level modal, so it is full-screen there, and
+        // the chevron ended up half under the status bar and barely tappable.
+        // ScreenScrollView now supplies the inset, so this is spacing below it.
         <View className="px-4 pt-3">
           <Pressable
             onPress={onBack}

@@ -24,7 +24,17 @@ export function subscribeToRestrooms(
   return onSnapshot(
     collection(db, COLLECTIONS.restrooms),
     (snap) => {
-      onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Restroom));
+      onChange(
+        snap.docs.map((d) => {
+          const data = d.data();
+          // `as Restroom` is an unchecked assertion, so a document written
+          // before photoIds existed — or by anything that skipped it — arrives
+          // with the field undefined and every `photoIds.length` downstream
+          // throws. One of those is inside the detail sheet, where the failure
+          // renders as a blank sheet with no error at all.
+          return { id: d.id, ...data, photoIds: data.photoIds ?? [] } as Restroom;
+        }),
+      );
     },
     onError,
   );
