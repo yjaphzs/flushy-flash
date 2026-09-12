@@ -179,7 +179,20 @@ function SheetBody({
           router.push(`/restroom/${restroom.id}`);
         }}
       >
-        <Button.Label>See reviews</Button.Label>
+        {/*
+          Count-aware, using the number the sheet already fetched. The zero case
+          matters most: a button saying "See reviews" that lands on an empty
+          state is the exact thing this codebase avoids elsewhere — and `null`
+          is "still loading or the read failed", which must NOT collapse into
+          zero (restroom/[id] already refuses that conflation).
+        */}
+        <Button.Label>
+          {reviews === null
+            ? 'See reviews'
+            : reviews === 0
+              ? 'Be the first to review'
+              : `See ${reviews} review${reviews === 1 ? '' : 's'}`}
+        </Button.Label>
       </Button>
     </View>
   );

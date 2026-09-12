@@ -1,20 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 
+import { BackButton } from '@/components/layouts/back-button';
+import { FormScreen } from '@/components/layouts/form-screen';
+import { Screen } from '@/components/layouts/screen';
+import { useScreenTopClearance } from '@/components/layouts/tab-bar-metrics';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
-import { FormScreen } from '@/components/layouts/form-screen';
-import { useRequestWrite } from '@/features/auth/use-auth-gate';
-import { likeRestroom, unlikeRestroom } from '@/features/likes/api';
 import { Icon } from '@/components/ui/icon';
-import { useCanWrite, useUid } from '@/stores/auth-store';
-import { useIsLiked } from '@/stores/likes-store';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
+import { useRequestWrite } from '@/features/auth/use-auth-gate';
+import { likeRestroom, unlikeRestroom } from '@/features/likes/api';
 import { fetchRatingSummary } from '@/features/restrooms/api';
+import { PhotoStrip } from '@/features/restrooms/components/photo-strip';
+import { ReviewList } from '@/features/reviews/components/review-list';
+import { useRestroomReviews } from '@/features/reviews/use-restroom-reviews';
+import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useBuildings, useCampusLoading, useRestrooms } from '@/stores/campus-store';
+import { useIsLiked } from '@/stores/likes-store';
 import type { Amenities } from '@/lib/types';
 
 const AMENITY_LABELS: Record<keyof Omit<Amenities, 'genderedAs'>, string> = {
@@ -33,6 +39,8 @@ export default function RestroomDetailScreen() {
   const uid = useUid();
   const canWrite = useCanWrite();
   const buildings = useBuildings();
+  const reviews = useRestroomReviews(id);
+  const topInset = useScreenTopClearance();
 
   const restroom = restrooms.find((r) => r.id === id);
   const building = buildings.find((b) => b.id === restroom?.buildingId);
@@ -86,49 +94,82 @@ export default function RestroomDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: building?.name ?? 'Restroom' }} />
-      <FormScreen
-        title={restroom.locationNote || `Floor ${restroom.floor}`}
-        subtitle={building ? `${building.name} · Floor ${restroom.floor}` : `Floor ${restroom.floor}`}
-        onBack={() => router.back()}
-        contentContainerClassName="gap-4 px-5 pb-10"
-      >
-        <Card>
-          <Card.Body>
-            <Card.Title>Rating</Card.Title>
-            {ratingFailed ? (
-              <Card.Description>Ratings are unavailable right now.</Card.Description>
-            ) : rating === null ? (
-              <Spinner />
-            ) : (
-              <Card.Description>
-                {rating.count > 0
-                  ? `${rating.average?.toFixed(1)} out of 5 · ${rating.count} reviews`
-                  : 'No reviews yet. Yours would be the first.'}
-              </Card.Description>
-            )}
-          </Card.Body>
-        </Card>
+      {/*
+        The page IS the list, and the detail is its header.
 
-        {amenityChips.length > 0 ? (
-          <View className="flex-row flex-wrap gap-2">
-            {amenityChips.map((key) => (
-              <Chip key={key}>
-                <Chip.Label>{AMENITY_LABELS[key]}</Chip.Label>
-              </Chip>
-            ))}
-          </View>
-        ) : null}
+        A `List` inside a `ScreenScrollView` is a nested VirtualizedList —
+        banned, and broken — so this inverts rather than nesting, which is also
+        why `FormScreen` cannot wrap it. The chevron and heading are drawn
+        inline from the same `BackButton` FormScreen uses, so the two surfaces
+        still look identical.
 
-        <View className="flex-row gap-3">
-          <Button
-            className="flex-1"
-            onPress={() => requestWrite({ href: `/review/${restroom.id}`, reason: 'review' })}
-          >
-            <Button.Label>Write a review</Button.Label>
-          </Button>
-          <LikeButton restroomId={restroom.id} uid={uid} canWrite={canWrite} />
-        </View>
-      </FormScreen>
+        The photo strip in the header is a HORIZONTAL list inside a vertical
+        one, which is the supported nesting case: different axis, and it is
+        header chrome rather than a row.
+      */}
+      <Screen topInset={false}>
+        <ReviewList
+          {...reviews}
+          uid={uid}
+          bottomInset={32}
+          header={
+            <View className="gap-4" style={{ paddingTop: topInset }}>
+              <BackButton onPress={() => router.back()} color="foreground" />
+
+              <View className="gap-1">
+                <Text type="h2" accessibilityRole="header">
+                  {restroom.locationNote || `Floor ${restroom.floor}`}
+                </Text>
+                <Text type="body-sm" color="muted">
+                  {building
+                    ? `${building.name} · Floor ${restroom.floor}`
+                    : `Floor ${restroom.floor}`}
+                </Text>
+              </View>
+
+              {/* Photos. This page has never shown them until now. */}
+              <PhotoStrip photoIds={restroom.photoIds} />
+
+              <Card>
+                <Card.Body>
+                  <Card.Title>Rating</Card.Title>
+                  {ratingFailed ? (
+                    <Card.Description>Ratings are unavailable right now.</Card.Description>
+                  ) : rating === null ? (
+                    <Spinner />
+                  ) : (
+                    <Card.Description>
+                      {rating.count > 0
+                        ? `${rating.average?.toFixed(1)} out of 5 · ${rating.count} reviews`
+                        : 'No reviews yet. Yours would be the first.'}
+                    </Card.Description>
+                  )}
+                </Card.Body>
+              </Card>
+
+              {amenityChips.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2">
+                  {amenityChips.map((key) => (
+                    <Chip key={key}>
+                      <Chip.Label>{AMENITY_LABELS[key]}</Chip.Label>
+                    </Chip>
+                  ))}
+                </View>
+              ) : null}
+
+              <View className="flex-row gap-3">
+                <Button
+                  className="flex-1"
+                  onPress={() => requestWrite({ href: `/review/${restroom.id}`, reason: 'review' })}
+                >
+                  <Button.Label>Write a review</Button.Label>
+                </Button>
+                <LikeButton restroomId={restroom.id} uid={uid} canWrite={canWrite} />
+              </View>
+            </View>
+          }
+        />
+      </Screen>
     </>
   );
 }

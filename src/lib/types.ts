@@ -113,7 +113,18 @@ export type Review = {
 
 export type UserProfile = {
   id: string;
-  handle: string;
+  /**
+   * Null on a deleted account's tombstone, which has no handle — the purge
+   * FREES it rather than reserving it, because a handle is usually the
+   * student's own name and keeping it would retain exactly the identifier the
+   * deletion was asked to sever.
+   */
+  handle: string | null;
+  /**
+   * On a tombstone this is the whimsical placeholder the Cloud Function chose
+   * (`functions/src/anon-names.ts`). Read from the document rather than
+   * regenerated on the client, so there is one list and it cannot drift.
+   */
   displayName: string;
   photoURL: string | null;
   /** Mirror of the auth token's claims; rules require the two to agree. */
@@ -121,6 +132,8 @@ export type UserProfile = {
   reviewCount: number;
   followerCount: number;
   followingCount: number;
+  /** Set only on a tombstone, by the account-deletion function. */
+  deleted?: boolean;
   createdAt: Timestamp;
 };
 

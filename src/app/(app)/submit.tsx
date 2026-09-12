@@ -17,7 +17,7 @@ import {
 } from '@/components/forms/text-field';
 import { EMPTY_AMENITIES } from '@/features/restrooms/api';
 import { useSubmitRestroom } from '@/features/restrooms/use-submit-restroom';
-import type { PickedPhoto } from '@/features/restrooms/photos';
+import type { ComposerPhoto } from '@/features/reviews/use-review-form';
 import { JoinBenefits } from '@/features/auth/components/join-benefits';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { useCanWrite, useUid } from '@/stores/auth-store';
@@ -59,7 +59,10 @@ export default function SubmitRestroomScreen() {
   const [locationNote, setLocationNote] = useState('');
   const [amenities, setAmenities] = useState<Amenities>(EMPTY_AMENITIES);
   const [genderedAs, setGenderedAs] = useState<GenderedAs | null>(null);
-  const [photos, setPhotos] = useState<PickedPhoto[]>([]);
+  // The union the shared picker speaks. Submit only ever holds 'new' items —
+// nothing is in Storage until Save — but adopting it here is what keeps one
+// picker in the app instead of a forked copy for reviews.
+  const [photos, setPhotos] = useState<ComposerPhoto[]>([]);
 
   /**
    * The building is a LABEL derived from the pin, not something to choose from a
@@ -86,7 +89,10 @@ export default function SubmitRestroomScreen() {
       locationNote,
       amenities,
       genderedAs,
-      photos,
+      // Submit never holds an 'existing' photo — nothing reaches Storage
+      // until this call — so narrowing here is total, not a cast that hides
+      // a case.
+      photos: photos.flatMap((p) => (p.kind === 'new' ? [{ uri: p.uri }] : [])),
       uid,
     });
     if (id) router.back();

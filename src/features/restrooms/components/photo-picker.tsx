@@ -5,15 +5,49 @@ import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import type { PickedPhoto } from '@/features/restrooms/photos';
+import type { ComposerPhoto } from '@/features/reviews/use-review-form';
+import { usePhotoUrl } from '@/features/restrooms/use-photo-url';
 
 const THUMB = 84;
 
 export type PhotoPickerProps = {
-  photos: PickedPhoto[];
-  onChange: (photos: PickedPhoto[]) => void;
+  photos: ComposerPhoto[];
+  onChange: (photos: ComposerPhoto[]) => void;
   max: number;
   pick: (remaining: number) => Promise<PickedPhoto[]>;
 };
+
+/** Stable identity for a photo of either kind, for keys and removal. */
+const idOf = (p: ComposerPhoto) => (p.kind === 'new' ? p.uri : p.path);
+
+/**
+ * One thumbnail. An `existing` photo is a Storage PATH and has to resolve
+ * through usePhotoUrl first; a `new` one is already a local file URI.
+ */
+function Thumb({ photo, index }: { photo: ComposerPhoto; index: number }) {
+  const resolved = usePhotoUrl(photo.kind === 'existing' ? photo.path : undefined);
+  const uri = photo.kind === 'new' ? photo.uri : resolved;
+
+  if (!uri) {
+    return (
+      <View
+        className="items-center justify-center rounded-xl bg-surface-secondary"
+        style={{ width: THUMB, height: THUMB, borderCurve: 'continuous' }}
+      >
+        <Icon name="image" size={18} color="muted" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={{ width: THUMB, height: THUMB, borderRadius: 12 }}
+      contentFit="cover"
+      accessibilityLabel={`Photo ${index + 1}`}
+    />
+  );
+}
 
 /**
  * Choose the photos for a submission, before anything is uploaded.
@@ -27,7 +61,9 @@ export function PhotoPicker({ photos, onChange, max, pick }: PhotoPickerProps) {
 
   async function add() {
     const picked = await pick(remaining);
-    if (picked.length > 0) onChange([...photos, ...picked]);
+    if (picked.length > 0) {
+      onChange([...photos, ...picked.map((p) => ({ kind: 'new' as const, uri: p.uri }))]);
+    }
   }
 
   return (
@@ -48,15 +84,10 @@ export function PhotoPicker({ photos, onChange, max, pick }: PhotoPickerProps) {
 
       <View className="flex-row flex-wrap gap-2">
         {photos.map((photo, index) => (
-          <View key={photo.uri} style={{ width: THUMB, height: THUMB }}>
-            <Image
-              source={{ uri: photo.uri }}
-              style={{ width: THUMB, height: THUMB, borderRadius: 12 }}
-              contentFit="cover"
-              accessibilityLabel={`Photo ${index + 1}`}
-            />
+          <View key={idOf(photo)} style={{ width: THUMB, height: THUMB }}>
+            <Thumb photo={photo} index={index} />
             <Pressable
-              onPress={() => onChange(photos.filter((p) => p.uri !== photo.uri))}
+              onPress={() => onChange(photos.filter((p) => idOf(p) !== idOf(photo)))}
               accessibilityRole="button"
               accessibilityLabel={`Remove photo ${index + 1}`}
               hitSlop={8}

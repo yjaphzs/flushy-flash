@@ -79,10 +79,18 @@ export default function BuildingDetailScreen() {
                   <Card>
                     <Card.Body>
                       <Card.Title>{restroom.locationNote || `Floor ${restroom.floor}`}</Card.Title>
+                      {/*
+                        NOT ratingSum/ratingCount. Those are aggregates the
+                        rules pin to 0 and no client may write, and no Cloud
+                        Function maintains them yet — so this card said "No
+                        reviews yet" on a restroom with forty. Ratings are read
+                        live via getAggregateFromServer on the detail page; a
+                        per-row read here would be one query per list item.
+                      */}
                       <Card.Description>
-                        {restroom.ratingCount > 0
-                          ? `${(restroom.ratingSum / restroom.ratingCount).toFixed(1)} · ${restroom.ratingCount} reviews`
-                          : 'No reviews yet'}
+                        {restroom.photoIds.length > 0
+                          ? `${restroom.photoIds.length} photo${restroom.photoIds.length === 1 ? '' : 's'}`
+                          : 'Tap for details'}
                       </Card.Description>
                     </Card.Body>
                     {restroom.status !== 'ok' ? (
