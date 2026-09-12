@@ -46,14 +46,22 @@ updates:
       - dependency-name: '@types/jest'
       - dependency-name: eslint-config-expo
       # ── Native modules: a bump means a new native build, not a lockfile edit ──
+      #
+      # NB: the `react-native-*` glob above does NOT cover a package whose name
+      # merely ENDS in react-native. lottie-react-native slipped through exactly
+      # that gap and Dependabot raised a 7.5.0 bump against the SDK's ~7.3.8,
+      # failing expo-doctor.
       - dependency-name: '@react-native-firebase/*'
       - dependency-name: '@maplibre/maplibre-react-native'
+      - dependency-name: '@react-native-google-signin/*'
+      - dependency-name: lottie-react-native
       # ── HeroUI and its styling engine move together; upgrade deliberately ──
       - dependency-name: heroui-native
       - dependency-name: uniwind
       - dependency-name: tailwindcss
 
-  # The rules test suite is isolated from the app tree, so it can move freely.
+  # The rules test suite is isolated from the app tree, so it moves freely —
+  # with one exception.
   - package-ecosystem: npm
     directory: /rules
     schedule:
@@ -62,3 +70,10 @@ updates:
     commit-message:
       prefix: 'chore(rules)'
     labels: [chore, dependencies]
+    ignore:
+      # ts-jest 29 peers on `typescript >=4.3 <7`, so a TypeScript MAJOR bump
+      # breaks `npm ci` in this directory outright — npm cannot resolve the tree
+      # and the rules suite never runs. Minor and patch updates are still
+      # welcome; majors wait for ts-jest to support them.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
