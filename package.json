@@ -20,6 +20,7 @@
     "firebase:placeholder": "node scripts/make-placeholder-firebase-config.mjs",
     "firebase:emulators": "npx --yes firebase-tools@15.30.0 emulators:start",
     "deploy:rules": "npx --yes firebase-tools@15.30.0 deploy --project flushy-flash --only firestore:rules,firestore:indexes,database,storage --non-interactive",
+    "deploy:functions": "npm --prefix functions run build && npx --yes firebase-tools@15.30.0 deploy --project flushy-flash --only functions --non-interactive",
     "firebase:sdkconfig": "npx --yes firebase-tools@15.30.0 apps:sdkconfig android --project flushy-flash --out google-services.json"
   },
   "dependencies": {

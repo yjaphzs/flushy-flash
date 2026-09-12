@@ -80,3 +80,8 @@ database-debug.log
 ui-debug.log
 firebase-debug.log
 .firebase/
+
+# Cloud Functions build output. `firebase deploy` compiles it from
+# functions/src via the predeploy hook; committing it would be committing
+# generated code.
+functions/lib/
