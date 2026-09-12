@@ -328,7 +328,7 @@ these are the ones you are most likely to touch.
 |---|---|---|
 | `EXPO_PUBLIC_FIREBASE_USE_EMULATORS` | `false` | run against local emulators |
 | `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` | per-platform | a **physical device** needs your LAN IP |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | unset | enables the Google Sign-In button |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | unset | enables the Google Sign-In button — unset means it silently does not render |
 | `EXPO_PUBLIC_MAP_STYLE_URL` | OpenFreeMap Liberty | a different tile provider |
 
 > [!IMPORTANT]

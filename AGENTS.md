@@ -613,6 +613,16 @@ Two things about it are easy to get wrong:
   the native SDK's own config it cannot come from `google-services.json`. It
   lives in `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (the `client_type: 3` entry). Unset
   ⇒ the button does not render, rather than failing at the tap.
+
+  ⚠️ **That graceful degradation hides a CI failure perfectly.** `.env.local` is
+  gitignored, so a workflow has no copy, and `EXPO_PUBLIC_*` is inlined by Metro
+  when gradle bundles the JS — it is not read at runtime. v1.0.0 therefore
+  shipped an APK with no Google button and a completely green build: nothing
+  typechecks, lints or tests an absent env var. `release.yml` now DERIVES it
+  from the `client_type: 3` entry of the `google-services.json` it already
+  writes from `GOOGLE_SERVICES_JSON` — no second secret, and it cannot drift
+  from the config it came from. **Any new workflow that produces an installable
+  build needs that step too.**
 - **A first-time Google user has no profile, and cannot be let into the app.**
   `firestore.rules` requires `users/{uid}` to be created *with* a handle, which
   Google does not supply. So the auth store has a fourth status, `needsProfile`,
