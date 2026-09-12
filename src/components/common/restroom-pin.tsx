@@ -71,7 +71,32 @@ export function RestroomPin({
   const refresh = useCallback(() => annotation.current?.refresh(), []);
 
   return (
-    <MapViewAnnotation ref={annotation} id={id} lngLat={toLngLat({ lat, lng })} onPress={onPress}>
+    /*
+      ⚠️ The `key` is the load-bearing part, and it is not a list key.
+
+      `refresh()` alone DOES NOT repaint the pin. Natively it calls
+      `style.addImage(bitmapId, bitmap)` where `bitmapId` is the child view's
+      React tag — which never changes — and then `symbolManager.update()`. The
+      sprite is replaced, but MapLibre does not re-place a symbol whose own
+      properties are identical, so the already-drawn glyph stays on screen
+      forever. Verified on device: onDisplay fires, refresh() runs against a
+      live ref, and the pin never changes.
+
+      The one thing that DOES repaint it is a size change, because that alters
+      the anchor offset and so is a real property change — which is why the
+      zoom morph works and the photo arriving does not.
+
+      Re-keying on the photo remounts the annotation, so the child view gets a
+      NEW React tag, hence a new bitmapId, hence a genuinely changed
+      `iconImage`. Costs one remount per pin the first time its photo resolves.
+    */
+    <MapViewAnnotation
+      key={photoUrl ?? 'glyph'}
+      ref={annotation}
+      id={id}
+      lngLat={toLngLat({ lat, lng })}
+      onPress={onPress}
+    >
       {/*
         onLayout is belt-and-braces for the morph. Native already re-captures on
         a bounds change, but an explicit post-layout refresh makes it
