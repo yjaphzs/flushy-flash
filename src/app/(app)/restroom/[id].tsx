@@ -115,9 +115,19 @@ export default function RestroomDetailScreen() {
             <View className="gap-4" style={{ paddingTop: topInset }}>
               <BackButton onPress={() => router.back()} color="foreground" />
 
+              {/*
+                The LANDMARK, matching the map sheet's `landmark || building.name
+                || 'Restroom'`. This page used to head itself with
+                `locationNote` — so the sheet and the page showed different text
+                for the same restroom, and the landmark, which is the thing a
+                stranger would actually recognise, appeared nowhere.
+
+                `weight="bold"` because h2 is only semibold by default and this
+                is the one line on the page that has to carry.
+              */}
               <View className="gap-1">
-                <Text type="h2" accessibilityRole="header">
-                  {restroom.locationNote || `Floor ${restroom.floor}`}
+                <Text type="h2" weight="bold" accessibilityRole="header">
+                  {restroom.landmark || building?.name || 'Restroom'}
                 </Text>
                 <Text type="body-sm" color="muted">
                   {building
@@ -128,6 +138,20 @@ export default function RestroomDetailScreen() {
 
               {/* Photos. This page has never shown them until now. */}
               <PhotoStrip photoIds={restroom.photoIds} />
+
+              {/*
+                Where locationNote belongs — it is directions, not a title. Same
+                block the sheet already renders, so the two surfaces now agree
+                on both the heading and this.
+              */}
+              {restroom.locationNote ? (
+                <View className="gap-1">
+                  <Text type="body-xs" weight="semibold" color="muted">
+                    HOW TO GET THERE
+                  </Text>
+                  <Text type="body-sm">{restroom.locationNote}</Text>
+                </View>
+              ) : null}
 
               <Card>
                 <Card.Body>

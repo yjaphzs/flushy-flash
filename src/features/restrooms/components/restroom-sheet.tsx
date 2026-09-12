@@ -141,7 +141,10 @@ function SheetBody({
   return (
     <View className="gap-5 px-5 pb-8 pt-2">
       <View className="gap-2">
-        <Text type="h3">{title}</Text>
+        {/* Bold to match /restroom/[id]'s heading — same restroom, same emphasis. */}
+        <Text type="h3" weight="bold">
+          {title}
+        </Text>
         <View className="flex-row flex-wrap items-center gap-2">
           <StatusChip status={restroom.status} />
           <AccessChip genderedAs={restroom.amenities.genderedAs} />
