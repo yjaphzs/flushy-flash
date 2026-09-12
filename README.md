@@ -1,3 +1,5 @@
+<img width="2000" height="1500" alt="flushy-flash-github-repository-cover" src="https://github.com/user-attachments/assets/eee81c91-4e7d-4631-ae40-caf030c10ef8" />
+
 # Flushy Flash
 
 [![ci](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml)
