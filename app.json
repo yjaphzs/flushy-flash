@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flushy Flash",
     "slug": "flushy-flash",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "flushyflash",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -26,7 +26,8 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.REQUEST_INSTALL_PACKAGES"
       ]
     },
     "web": {
@@ -78,7 +79,8 @@
           "android": {
             "minSdkVersion": 24,
             "compileSdkVersion": 36,
-            "targetSdkVersion": 36
+            "targetSdkVersion": 36,
+            "useLegacyPackaging": true
           }
         }
       ],

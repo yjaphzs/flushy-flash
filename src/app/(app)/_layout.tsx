@@ -3,6 +3,8 @@ import { Stack } from 'expo-router';
 import { useAuthGateResume } from '@/features/auth/use-auth-gate';
 import { useCampusData } from '@/hooks/use-campus-data';
 import { useMyLikes } from '@/hooks/use-my-likes';
+import { UpdateDialog } from '@/features/updates/components/update-dialog';
+import { useUpdateCheck } from '@/features/updates/use-update-check';
 
 export default function AppLayout() {
   // Mounted here rather than on the map tab. (app) is now permanently mounted
@@ -18,6 +20,10 @@ export default function AppLayout() {
   // Keyed on uid: clears on sign-out, re-opens on sign-in.
   useMyLikes();
 
+  // Here rather than on a screen: (app) is permanently mounted, so a download
+  // in flight survives navigation and the dialog never remounts mid-transfer.
+  useUpdateCheck();
+
   return (
     /*
       Headers OFF for the whole group, matching `(auth)`.
@@ -32,25 +38,28 @@ export default function AppLayout() {
       it still feeds the route title and the accessibility tree, and Android
       hardware back is unaffected either way.
     */
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="building/[id]" options={{ title: 'Building' }} />
-      <Stack.Screen name="restroom/[id]" options={{ title: 'Restroom' }} />
-      {/* Screen-level modals use native presentations, not a JS bottom sheet. */}
-      <Stack.Screen
-        name="submit"
-        options={{ presentation: 'modal', title: 'Add a restroom', sheetGrabberVisible: true }}
-      />
-      <Stack.Screen
-        name="review/[restroomId]"
-        options={{
-          presentation: 'formSheet',
-          title: 'Write a review',
-          sheetAllowedDetents: [0.6, 1],
-          sheetGrabberVisible: true,
-        }}
-      />
-      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-    </Stack>
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="building/[id]" options={{ title: 'Building' }} />
+        <Stack.Screen name="restroom/[id]" options={{ title: 'Restroom' }} />
+        {/* Screen-level modals use native presentations, not a JS bottom sheet. */}
+        <Stack.Screen
+          name="submit"
+          options={{ presentation: 'modal', title: 'Add a restroom', sheetGrabberVisible: true }}
+        />
+        <Stack.Screen
+          name="review/[restroomId]"
+          options={{
+            presentation: 'formSheet',
+            title: 'Write a review',
+            sheetAllowedDetents: [0.6, 1],
+            sheetGrabberVisible: true,
+          }}
+        />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+      </Stack>
+      <UpdateDialog />
+    </>
   );
 }

@@ -1,8 +1,16 @@
 {
   "compilerOptions": {
     "strict": true,
-    "module": "commonjs",
-    "moduleResolution": "node",
+    // node16, not the older "commonjs"/"node" pair. TypeScript 6 rejects
+    // `moduleResolution: node10` outright (TS5107), which broke `tsc --noEmit`
+    // here and took firebase-rules.yml's typecheck step with it.
+    //
+    // node16 is also the better resolver rather than merely the permitted one:
+    // node10 cannot read a package's "exports" map, and firebase 12 and
+    // @firebase/rules-unit-testing both ship one. rules/package.json has no
+    // "type": "module", so this still emits CommonJS for ts-jest.
+    "module": "node16",
+    "moduleResolution": "node16",
     "target": "es2022",
     "lib": ["es2022"],
     "types": ["node", "jest"],

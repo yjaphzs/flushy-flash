@@ -124,7 +124,25 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --no-daemon
+        # ABIs restricted HERE, on the command line, rather than in app.json.
+        #
+        # The published v1.0.1 APK was 161 MB, and 125 MB of that was native
+        # libraries across four architectures — x86 and x86_64 alone were 69 MB,
+        # 45% of what every student downloads, and only an emulator can use them.
+        #
+        # @react-native/gradle-plugin turns reactNativeArchitectures into
+        # defaultConfig.ndk.abiFilters whenever splits.abi is not enabled
+        # (NdkConfiguratorUtils.kt:59-62), so this is the whole change.
+        #
+        # NOT expo-build-properties' buildArchs: that writes gradle.properties,
+        # which would also narrow every developer's debug build and
+        # native-check.yml's assembleDebug. The release is the only build that
+        # should be narrow.
+        #
+        # armeabi-v7a stays. minSdk is 24, and a 32-bit Android 7 phone is
+        # exactly the budget device a CLSU student is most likely to own;
+        # dropping it makes the app un-installable for them with no diagnostic.
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
 
       # A debug-signed APK would mean students cannot upgrade in place later, and
       # CI would otherwise report that as a success. Fail loudly instead.
@@ -147,6 +165,58 @@ jobs:
           DEST="flushy-flash-${{ steps.version.outputs.tag }}.apk"
           cp "$SRC" "$DEST"
           echo "path=$DEST" >> "$GITHUB_OUTPUT"
+          echo "bytes=$(stat -c%s "$DEST")" >> "$GITHUB_OUTPUT"
+          # Shipped in the manifest so an integrity check can be added later
+          # without a schema bump. The client verifies SIZE today: hashing 50 MB
+          # in JS is slow, the transport is TLS, and a tampered APK fails the
+          # installer's own signature check against the installed certificate.
+          echo "sha256=$(sha256sum "$DEST" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "### APK: $DEST ($(numfmt --to=iec "$(stat -c%s "$DEST")"))" >> "$GITHUB_STEP_SUMMARY"
+
+      # The in-app updater reads THIS, not the GitHub API.
+      #
+      # api.github.com is 60 requests/hour/IP unauthenticated, and a campus
+      # shares one public IP — a few hundred students on a 6h check interval
+      # would spend most of the day rate-limited, and a 403 is indistinguishable
+      # from "no update" without special handling. Authenticating is impossible:
+      # EXPO_PUBLIC_* is inlined and readable inside the APK, so shipping a token
+      # would be publishing it.
+      #
+      # releases/latest/download/<name> is a stable redirect on github.com, which
+      # is not rate-limited that way. It also carries the exact byte size, so the
+      # UI can say "52 MB" BEFORE starting a download.
+      - name: Write the update manifest
+        id: manifest
+        run: |
+          node -e "
+            const fs = require('fs');
+            const tag = process.env.TAG;
+            const apk = process.env.APK;
+            fs.writeFileSync('latest.json', JSON.stringify({
+              schema: 1,
+              version: tag.replace(/^v/, ''),
+              versionCode: Number(process.env.RUN_NUMBER),
+              notes: null,
+              apk: {
+                url: \`https://github.com/\${process.env.REPO}/releases/download/\${tag}/\${apk}\`,
+                bytes: Number(process.env.BYTES),
+                sha256: process.env.SHA256,
+              },
+              minSdk: 24,
+              abi: 'arm64-v8a,armeabi-v7a',
+              // Filled in when expo-updates lands; the client prefers OTA when the
+              // runtime matches and falls back to the APK when it does not.
+              ota: null,
+            }, null, 2) + '\n');
+          "
+          cat latest.json
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          APK: ${{ steps.apk.outputs.path }}
+          BYTES: ${{ steps.apk.outputs.bytes }}
+          RUN_NUMBER: ${{ github.run_number }}
+          REPO: ${{ github.repository }}
+          SHA256: ${{ steps.apk.outputs.sha256 }}
 
       - uses: actions/upload-artifact@v7
         with:
@@ -159,7 +229,9 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Flushy Flash ${{ steps.version.outputs.tag }}
-          files: ${{ steps.apk.outputs.path }}
+          files: |
+            ${{ steps.apk.outputs.path }}
+            latest.json
           generate_release_notes: true
           body: |
             ## Install

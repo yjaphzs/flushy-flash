@@ -86,6 +86,22 @@ account is only required to contribute.
 
 Requires **Android 7.0 or newer**. iOS builds are not published yet.
 
+Once installed, the app checks for newer releases itself and offers to
+download and install them — you only need to do the above once.
+
+> [!NOTE]
+> **Samsung phones may block the install outright.** One UI 6.1 and newer ship
+> **Auto Blocker** switched on, which refuses apps from outside the Galaxy Store
+> and Play Store entirely — no permission prompt, just a system dialog the app
+> never sees. Turn it off in **Settings → Security and privacy → Auto Blocker**,
+> or install from a phone without it.
+
+> [!IMPORTANT]
+> Only an APK signed with the same release key can replace an installed one.
+> A build you compiled yourself cannot update a Releases install, and vice
+> versa — Android reports both as a bare "App not installed". Uninstall first
+> if you are switching between them.
+
 ---
 
 ## Stack

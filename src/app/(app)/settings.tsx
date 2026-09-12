@@ -12,6 +12,7 @@ import { refreshClaims, resendVerification, signOut } from '@/features/auth/api'
 import { authErrorMessage } from '@/features/auth/errors';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { useAuthStatus, useAuthStore, useIsVerifiedStudent } from '@/stores/auth-store';
+import { UpdateRow } from '@/features/updates/components/update-row';
 
 /**
  * Reachable by guests now that the app is guest-first, which this screen was
@@ -73,7 +74,9 @@ export default function SettingsScreen() {
             does not inherit the outer variant's typography.
           */}
           <Card.Description>
-            {isGuest ? (
+            <UpdateRow />
+
+      {isGuest ? (
               <>
                 Students with a <CampusDomain /> address get a badge, and can edit shared
                 entries.
