@@ -575,6 +575,39 @@ was not involved.
 `vX.Y.Z`, push with `--tags`. The workflow sets `versionCode` from the run number
 (monotonic, which Android requires for in-place upgrades) — do not set it by hand.
 
+**Release builds are ABI-restricted, and that is where the download size went.**
+v1.0.0 shipped a 161 MB APK; 125 MB of it was native libraries across four
+architectures, and **x86 + x86_64 alone were 69 MB — 45% of every student's
+download, usable only by an emulator**. `release.yml` therefore passes
+`-PreactNativeArchitectures=arm64-v8a,armeabi-v7a` on the gradle command line,
+which `@react-native/gradle-plugin` turns into `defaultConfig.ndk.abiFilters`
+(`NdkConfiguratorUtils.kt:59-62`). Paired with `useLegacyPackaging: true` in
+`app.json`, which compresses the `.so` files inside the APK.
+
+Three things about that are easy to get wrong:
+
+- **It is a CLI flag, not `expo-build-properties`' `buildArchs`.** That option
+  writes `gradle.properties`, which would narrow every developer's debug build
+  and `native-check.yml`'s `assembleDebug` too. Only the release should be narrow.
+- **`armeabi-v7a` stays.** minSdk is 24, and a 32-bit Android 7 phone is exactly
+  the budget device a CLSU student is most likely to own. Dropping it makes the
+  app un-installable for them with no useful diagnostic.
+- **A release build can no longer run on an x86_64 emulator.** Debug builds are
+  unaffected, which is what emulator testing already uses.
+
+**Per-ABI `splits` were considered and rejected.** They save perhaps another
+20 MB and cost: multiple release assets instead of the one deterministic name,
+a hand-managed `versionCode` offset per split colliding with the run-number rule
+above, and `expo-device` as a third native dependency purely so the updater
+could pick the right asset.
+
+**The release also publishes `latest.json`** beside the APK — the manifest the
+in-app updater reads. It is served from `releases/latest/download/latest.json`
+on **github.com**, deliberately NOT `api.github.com`, which is 60 requests per
+hour per IP unauthenticated: a campus shares one public IP, and a 403 there is
+indistinguishable from "no update". Authenticating is impossible because
+`EXPO_PUBLIC_*` is inlined into the APK, so shipping a token would publish it.
+
 **Android release signing lives in a config plugin**, `plugins/with-release-signing.js`,
 not in a patched `android/`. Expo's bare template points `buildTypes.release` at
 `signingConfigs.debug`, so a release build is debug-signed out of the box — which

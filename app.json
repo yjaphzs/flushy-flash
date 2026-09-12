@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flushy Flash",
     "slug": "flushy-flash",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "flushyflash",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -78,7 +78,8 @@
           "android": {
             "minSdkVersion": 24,
             "compileSdkVersion": 36,
-            "targetSdkVersion": 36
+            "targetSdkVersion": 36,
+            "useLegacyPackaging": true
           }
         }
       ],
