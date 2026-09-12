@@ -9,6 +9,8 @@ import {
   Callout as MLCallout,
   type LngLat,
   type LngLatBounds,
+  type ViewState,
+  type ViewStateChangeEvent,
 } from '@maplibre/maplibre-react-native';
 
 import { CAMPUS_BOUNDS, CAMPUS_CENTER, INITIAL_ZOOM, MAX_ZOOM, MIN_ZOOM, MAP_STYLE_URL } from '@/lib/campus';
@@ -40,8 +42,33 @@ export type MapCameraRef = React.ComponentRef<typeof MLCamera>;
  */
 export type MapViewAnnotationRef = React.ComponentRef<typeof MLViewAnnotation>;
 
+/**
+ * The viewport, as `onRegionDidChange` reports it: `{ center, zoom, bearing,
+ * pitch, bounds }` plus `animated` / `userInteraction`.
+ *
+ * ⚠️ There is **no `onCameraChanged` and no `MapState`** in v11 — those are
+ * Mapbox names. The three real events are `onRegionWillChange`,
+ * `onRegionIsChanging` (every frame of a gesture) and `onRegionDidChange` (on
+ * settle). `MapCameraRef` has no zoom getter either; zoom arrives on the event.
+ */
+export type { ViewState, ViewStateChangeEvent };
+
 /** MapLibre takes [lng, lat]; our domain types use { lat, lng }. Convert here, once. */
 export const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
+
+/** The viewport rectangle, named. MapLibre hands it over as a bare 4-tuple. */
+export type MapBounds = { west: number; south: number; east: number; north: number };
+
+/**
+ * `LngLatBounds` is `[west, south, east, north]` — lng first, and easy to index
+ * wrongly. Converting here means no caller has to remember the order.
+ */
+export const fromLngLatBounds = ([west, south, east, north]: LngLatBounds): MapBounds => ({
+  west,
+  south,
+  east,
+  north,
+});
 
 /** Bounds as MapLibre wants them: [west, south, east, north]. */
 export const CAMPUS_MAX_BOUNDS: LngLatBounds = [

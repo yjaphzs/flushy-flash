@@ -1,0 +1,246 @@
+import { useCSSVariable } from 'uniwind';
+
+import type { PinShape } from '@/components/common/pin-zoom';
+import { Icon } from '@/components/ui/icon';
+import { Image } from '@/components/ui/image';
+import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
+
+/**
+ * Pin geometry, per shape.
+ *
+ * `size` is the OUTER diameter including the ring, and 44 is a floor rather
+ * than a taste: the annotation's hit target is the rendered symbol's bounds, so
+ * a smaller pin is an undersized touch target (AGENTS.md §4).
+ */
+const BUBBLE = {
+  'bubble-sm': { size: 44, tail: 8 },
+  bubble: { size: 60, tail: 10 },
+} as const;
+
+const CARD = { width: 140, photo: 80, caption: 26, radius: 16, tail: 10 } as const;
+
+/**
+ * The frame is TWO rings, and that is not decoration.
+ *
+ * A single white ring is invisible on the light map — which is most of campus —
+ * so the pin dissolved into the background. A single accent ring sits straight
+ * against the photo and reads as a coloured smudge on a dark image. Accent
+ * outside for separation from the map, white inside to frame the photo, which
+ * is the same reason a physical print gets a mount.
+ *
+ * Drawn as backgroundColor + padding rather than nested borderWidths: Android
+ * rounds each border box independently and a 2px border inside another 2px
+ * border leaves visible corner artefacts at these radii.
+ */
+const FRAME_OUTER = 2;
+const FRAME_INNER = 2;
+const FRAME = FRAME_OUTER + FRAME_INNER;
+
+export type PinBodyProps = {
+  shape: PinShape;
+  /** Resolved URL of the first photo, or null for the glyph fallback. */
+  photoUrl: string | null;
+  /** Caption for the card shape — the landmark, or the building name. */
+  label: string;
+  /** Whether this pin's sheet is currently open. */
+  selected: boolean;
+  /** Fires when the photo is genuinely on screen; drives the bitmap re-capture. */
+  onPhotoDisplay: () => void;
+};
+
+/**
+ * The drawn part of a restroom pin, in three sizes.
+ *
+ * Split from `restroom-pin.tsx` so that file stays purely the MapLibre
+ * annotation boundary and this one is ordinary views — which is also what keeps
+ * both under the 200-line cap.
+ *
+ * ## Why the ring colour is resolved to a value
+ *
+ * `useCSSVariable` rather than a `border-accent` class, for the same reason
+ * `ui/icon.tsx` does it: the tail is a CSS-triangle built from border widths,
+ * and its colour has to be the same resolved string as the ring's or the two
+ * halves of the teardrop disagree. One source, passed to both.
+ *
+ * ## No drop shadow, deliberately
+ *
+ * Android rasterises these views with a software `draw()`, and `elevation` is
+ * drawn by the PARENT's RenderNode — so it does not appear in the capture at
+ * all. The ring does that job: it is what separates a night-time entrance shot
+ * from the dark map underneath.
+ */
+export function PinBody({ shape, photoUrl, label, selected, onPhotoDisplay }: PinBodyProps) {
+  const resolved = useCSSVariable('--color-accent');
+  /**
+   * A fourth sRGB copy of --accent, and it is registered in AGENTS.md §14's
+   * duplicated-colours table. It only appears if uniwind cannot resolve the
+   * variable, which it reports as a __DEV__ warning and nothing else — so a
+   * wrong value here would ship looking fine.
+   */
+  const accent = typeof resolved === 'string' ? resolved : '#00855E';
+  // Selected fills the mount with the accent too, so the whole frame reads as
+  // one solid colour rather than changing a ring nobody was looking at.
+  const mount = selected ? accent : '#FFFFFF';
+
+  if (shape === 'card') {
+    const contentW = CARD.width - FRAME * 2;
+    return (
+      <View className="items-center">
+        <View
+          style={{
+            backgroundColor: accent,
+            padding: FRAME_OUTER,
+            borderRadius: CARD.radius,
+            borderCurve: 'continuous',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: mount,
+              padding: FRAME_INNER,
+              borderRadius: CARD.radius - FRAME_OUTER,
+              borderCurve: 'continuous',
+            }}
+          >
+            <View
+              className="overflow-hidden bg-background"
+              style={{ borderRadius: CARD.radius - FRAME, borderCurve: 'continuous' }}
+            >
+              <Photo
+                url={photoUrl}
+                width={contentW}
+                height={CARD.photo}
+                glyph={28}
+                onDisplay={onPhotoDisplay}
+              />
+              {/*
+                Fixed height and one line. A wrapping caption changes the view's
+                bounds, which changes the bitmap, which changes the anchor
+                offset — so a two-line landmark would make the pin visibly
+                taller than its neighbours for no gain.
+              */}
+              <View
+                className="justify-center px-2"
+                style={{ height: CARD.caption, width: contentW }}
+              >
+                <Text type="body-xs" weight="medium" numberOfLines={1}>
+                  {label}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+        <Tail size={CARD.tail} color={accent} />
+      </View>
+    );
+  }
+
+  const { size, tail } = BUBBLE[shape];
+  const photo = size - FRAME * 2;
+
+  return (
+    <View className="items-center">
+      <View
+        style={{
+          backgroundColor: accent,
+          padding: FRAME_OUTER,
+          borderRadius: size / 2,
+          borderCurve: 'continuous',
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: mount,
+            padding: FRAME_INNER,
+            borderRadius: (size - FRAME_OUTER * 2) / 2,
+            borderCurve: 'continuous',
+          }}
+        >
+          <View
+            className="items-center justify-center overflow-hidden bg-accent"
+            style={{ borderRadius: photo / 2, borderCurve: 'continuous' }}
+          >
+            <Photo
+              url={photoUrl}
+              width={photo}
+              height={photo}
+              glyph={size > 50 ? 24 : 20}
+              onDisplay={onPhotoDisplay}
+            />
+          </View>
+        </View>
+      </View>
+      <Tail size={tail} color={accent} />
+    </View>
+  );
+}
+
+/**
+ * The photo, or the glyph when there is none.
+ *
+ * `transition={0}` and `onDisplay` are both load-bearing on Android and must
+ * stay together — see the docblock in `restroom-pin.tsx`. `onLoad` fires before
+ * the drawable is attached and cannot work here.
+ */
+function Photo({
+  url,
+  width,
+  height,
+  glyph,
+  onDisplay,
+}: {
+  url: string | null;
+  width: number;
+  height: number;
+  glyph: number;
+  onDisplay: () => void;
+}) {
+  if (!url) {
+    return (
+      <View className="items-center justify-center bg-accent" style={{ width, height }}>
+        <Icon name="map-pin" size={glyph} color="on-accent" />
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: url }}
+      style={{ width, height }}
+      contentFit="cover"
+      transition={0}
+      onDisplay={onDisplay}
+      // Keyed on the PHOTO, not the restroom: a changed first photo would
+      // otherwise reuse the recycled view and show the old image.
+      recyclingKey={url}
+    />
+  );
+}
+
+/**
+ * The teardrop's point, as a CSS triangle.
+ *
+ * Border widths rather than a rotated square: a rotation would need the shape
+ * to overlap the body above it to hide its top corner, and the overlap differs
+ * per pin size. A triangle is exact at every size and rasterises identically.
+ */
+function Tail({ size, color }: { size: number; color: string }) {
+  return (
+    <View
+      style={{
+        width: 0,
+        height: 0,
+        // Pulled up by a pixel: the tail and the frame are the same colour and
+        // must read as one shape, and rounding can otherwise leave a hairline.
+        marginTop: -1,
+        borderLeftWidth: size * 0.7,
+        borderRightWidth: size * 0.7,
+        borderTopWidth: size,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderTopColor: color,
+      }}
+    />
+  );
+}

@@ -1,20 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   CAMPUS_MAX_BOUNDS,
   Map,
   MapCamera,
   MapUserLocation,
+  fromLngLatBounds,
+  type MapBounds,
   type MapCameraRef,
+  type ViewStateChangeEvent,
   useMapStyle,
   campusCameraProps,
 } from '@/components/common/map';
-import { RestroomPin } from '@/components/common/restroom-pin';
+import { nextShape, visiblePins, type PinShape } from '@/components/common/pin-zoom';
+import { RestroomMarker } from '@/features/restrooms/components/restroom-marker';
 import { RestroomSheet } from '@/features/restrooms/components/restroom-sheet';
 import { CampusStatus, NearestStatus } from '@/features/restrooms/components/map-status';
 import { SearchingDialog } from '@/features/restrooms/components/searching-dialog';
-import { usePhotoUrl } from '@/features/restrooms/use-photo-url';
-import type { Restroom } from '@/lib/types';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { AddRestroomButton } from '@/components/common/add-restroom-button';
 import { Screen } from '@/components/layouts/screen';
@@ -22,7 +24,7 @@ import { useTabBarClearance, useTopInset } from '@/components/layouts/tab-bar-me
 import { View } from '@/components/ui/view';
 import { lastKnownPoint } from '@/lib/location';
 import { useMapFocus } from '@/stores/map-focus-store';
-import { useRestrooms } from '@/stores/campus-store';
+import { useBuildings, useRestrooms } from '@/stores/campus-store';
 
 export default function MapScreen() {
   const requestWrite = useRequestWrite();
@@ -45,6 +47,7 @@ export default function MapScreen() {
     camera.current?.flyTo({ center: [focus.lng, focus.lat], zoom: 18, duration: 900 });
   }, [focus]);
   const restrooms = useRestrooms();
+  const buildings = useBuildings();
   /**
    * The pin tap opens a sheet rather than navigating: the map stays behind it,
    * which is the whole point of a sheet over a page.
@@ -71,6 +74,53 @@ export default function MapScreen() {
    * added, and nothing until they have.
    */
   const pins = useMemo(() => restrooms.filter((r) => r.location), [restrooms]);
+
+  /**
+   * Zoom drives the pin SHAPE, and the viewport gates how many are drawn.
+   *
+   * `onRegionDidChange` fires on SETTLE, never mid-gesture. `onRegionIsChanging`
+   * is dispatched from the camera-move listener — every frame of a pinch — and
+   * each shape change is a full offscreen bitmap re-capture per pin, so driving
+   * it from that would re-rasterise the whole map dozens of times per gesture.
+   * Waiting for the settle also means the cut lands when the user has already
+   * stopped moving, which reads as intentional rather than as a stutter.
+   */
+  const [shape, setShape] = useState<PinShape>('bubble-sm');
+  const [view, setView] = useState<{
+    bounds: MapBounds;
+    center: { lat: number; lng: number };
+  } | null>(null);
+
+  const onRegionDidChange = useCallback((e: { nativeEvent: ViewStateChangeEvent }) => {
+    const { zoom, bounds, center } = e.nativeEvent;
+    // nextShape takes the CURRENT shape because the thresholds have a deadband;
+    // that is what stops a camera resting on a boundary flapping.
+    setShape((prev) => nextShape(zoom, prev));
+    setView({ bounds: fromLngLatBounds(bounds), center: { lat: center[1], lng: center[0] } });
+  }, []);
+
+  /**
+   * Inert below 60 pins, so nothing changes at today's data volumes. Past that
+   * it culls to the padded viewport — which is a MEMORY bound, not a frame-rate
+   * one: every pin is an ARGB_8888 bitmap at device density, and 300 cards on a
+   * 3x screen is ~172 MB.
+   */
+  /**
+   * The accent ring is the only thing tying the open sheet to the pin it came
+   * from. Narrowed to null while the sheet is closed rather than tested inline,
+   * so `selectedId` can outlive the close animation without the ring doing so.
+   */
+  const selectedPinId = sheetOpen ? selectedId : null;
+
+  const visible = useMemo(
+    () =>
+      visiblePins(
+        pins,
+        (r) => ({ lat: r.location.latitude, lng: r.location.longitude }),
+        view,
+      ),
+    [pins, view],
+  );
 
   return (
     // Full-bleed: the map draws to every edge and positions its own banners and
@@ -99,14 +149,18 @@ export default function MapScreen() {
         logoPosition={{ bottom: clearance, left: 12 }}
         attributionPosition={{ bottom: clearance, left: 44 }}
         compassPosition={{ bottom: clearance + 44, left: 12 }}
+        onRegionDidChange={onRegionDidChange}
       >
         <MapCamera ref={camera} {...campusCameraProps} maxBounds={CAMPUS_MAX_BOUNDS} />
         <MapUserLocation />
 
-        {pins.map((restroom) => (
-          <RestroomPinWithPhoto
+        {visible.map((restroom) => (
+          <RestroomMarker
             key={restroom.id}
             restroom={restroom}
+            buildings={buildings}
+            shape={shape}
+            selected={restroom.id === selectedPinId}
             onPress={() => {
               setSelectedId(restroom.id);
               setSheetOpen(true);
@@ -157,33 +211,5 @@ export default function MapScreen() {
         onClose={() => setSheetOpen(false)}
       />
     </Screen>
-  );
-}
-
-/**
- * A pin, with its first photo resolved.
- *
- * The hook cannot go in the parent's map callback — hooks cannot be called in a
- * loop — so each pin is its own component. That also means one photo request per
- * pin rather than one batch, which is fine: usePhotoUrl memoises by path
- * process-wide, so the sheet reuses whatever the pin already fetched.
- */
-function RestroomPinWithPhoto({
-  restroom,
-  onPress,
-}: {
-  restroom: Restroom;
-  onPress: () => void;
-}) {
-  const photo = usePhotoUrl(restroom.photoIds[0]);
-
-  return (
-    <RestroomPin
-      id={restroom.id}
-      lat={restroom.location.latitude}
-      lng={restroom.location.longitude}
-      photoUrl={photo}
-      onPress={onPress}
-    />
   );
 }
