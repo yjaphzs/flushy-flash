@@ -38,14 +38,26 @@ const CONTENT_TYPE = 'image/webp';
 const EXTENSION = 'webp';
 
 /**
- * Object path for one restroom photo.
+ * Which bucket prefix a photo belongs under.
+ *
+ * Review photos get their OWN prefix rather than being filed under the
+ * restroom's. Sharing it would need no `storage.rules` change, which is
+ * tempting — but a review photo sitting in the restroom's namespace *is* a
+ * restroom photo to the first person who looks, and the review id already
+ * encodes both the restroom and the author, which is what makes abuse triage
+ * and orphan cleanup possible without reading Firestore.
+ */
+export type PhotoFolder = 'restrooms' | 'reviews';
+
+/**
+ * Object path for one photo.
  *
  * The id is random rather than an index because objects are immutable and
  * deletes leave gaps — an index would collide with a previously-deleted photo.
  */
-function photoPath(restroomId: string, index: number) {
+function photoPath(folder: PhotoFolder, ownerId: string, index: number) {
   const unique = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  return `restrooms/${restroomId}/${index}-${unique}.${EXTENSION}`;
+  return `${folder}/${ownerId}/${index}-${unique}.${EXTENSION}`;
 }
 
 export type UploadedPhoto = { path: string };
@@ -56,14 +68,16 @@ export type UploadedPhoto = { path: string };
  * `putFile` takes a local filesystem URI, which is what the picker hands back —
  * no read into memory, so an 8 MB photo does not become an 8 MB JS string.
  */
-export async function uploadRestroomPhoto(opts: {
-  restroomId: string;
+export async function uploadPhoto(opts: {
+  folder: PhotoFolder;
+  /** Restroom id, or review id — whichever owns the folder. */
+  ownerId: string;
   uid: string;
   /** Local file URI from the picker, already resized. */
   uri: string;
   index: number;
 }): Promise<UploadedPhoto> {
-  const path = photoPath(opts.restroomId, opts.index);
+  const path = photoPath(opts.folder, opts.ownerId, opts.index);
   await putFile(ref(storage, path), opts.uri, {
     contentType: CONTENT_TYPE,
     // Not decoration — storage.rules refuses the write without it.
@@ -80,12 +94,12 @@ export function photoUrl(path: string): Promise<string> {
 /**
  * Best-effort cleanup for photos whose document write then failed.
  *
- * Orphans are possible by construction: photos upload before the restroom
- * document exists, because the object path contains its id. Losing the race
+ * Orphans are possible by construction: photos upload before the document
+ * exists, because the object path contains its id. Losing the race
  * leaves bytes nobody references — wasted, but harmless and invisible, which is
  * the right direction to fail. Never let cleanup failure mask the original
  * error.
  */
-export async function deleteRestroomPhotos(paths: readonly string[]) {
+export async function deletePhotos(paths: readonly string[]) {
   await Promise.allSettled(paths.map((path) => deleteObject(ref(storage, path))));
 }

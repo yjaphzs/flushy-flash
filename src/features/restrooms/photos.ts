@@ -57,7 +57,7 @@ export type PickedPhoto = {
  * Permission is requested by `launchImageLibraryAsync` itself on both platforms,
  * so there is no separate request step to keep in sync.
  */
-export async function pickRestroomPhotos(remaining: number): Promise<PickedPhoto[]> {
+export async function pickPhotos(remaining: number): Promise<PickedPhoto[]> {
   if (remaining <= 0) return [];
 
   const result = await ImagePicker.launchImageLibraryAsync({

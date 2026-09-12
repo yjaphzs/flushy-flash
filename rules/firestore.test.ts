@@ -789,3 +789,153 @@ describe('account deletion stays server-side', () => {
     );
   });
 });
+
+/**
+ * The review EDIT path.
+ *
+ * "One review per restroom, always yours to edit" is a promise the guest screen
+ * makes, and until this block existed the update rule had exactly one negative
+ * case — nothing proved an author could edit at all, and nothing covered the
+ * photo cap, the score range or the immutable fields on that path.
+ */
+describe('editing your own review', () => {
+  const aliceReview = `${RESTROOM_ID}_${ALICE}`;
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reviews', aliceReview), reviewDoc());
+    });
+  });
+
+  const edit = (overrides: Record<string, unknown>) => ({
+    rating: 5,
+    cleanliness: 4,
+    text: 'Cleaner than last week.',
+    photoIds: [],
+    updatedAt: serverTimestamp(),
+    ...overrides,
+  });
+
+  it('allows the author to edit rating, cleanliness and text', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(updateDoc(doc(db, 'reviews', aliceReview), edit({})));
+  });
+
+  it('allows editing with exactly five photos', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'reviews', aliceReview), edit({ photoIds: photoPaths(5) })),
+    );
+  });
+
+  // The hole this block was written for: create capped photos at five, update
+  // capped at nothing, and update is the path used repeatedly.
+  it('denies editing past the five-photo cap', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'reviews', aliceReview), edit({ photoIds: photoPaths(6) })),
+    );
+  });
+
+  /**
+   * Pins WHY the client uses updateDoc and not setDoc. A full setDoc re-stamps
+   * createdAt, which puts it in changedKeys() and is denied — with a bare
+   * permission-denied naming nothing. This is the easiest thing for a future
+   * edit to "simplify" back into a bug.
+   */
+  it('denies re-stamping createdAt on edit', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'reviews', aliceReview), edit({ createdAt: serverTimestamp() })),
+    );
+  });
+
+  it('denies moving a review to another restroom', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({ restroomId: 'other' })));
+  });
+
+  it('denies moving a review to another building', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({ buildingId: 'other' })));
+  });
+
+  it('denies reassigning authorship on edit', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({ authorId: BOB })));
+  });
+
+  it('denies an unknown field on edit', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({ isFeatured: true })));
+  });
+
+  // isValidScore on the update path had no coverage at all.
+  it('denies an out-of-range cleanliness on edit', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({ cleanliness: 9 })));
+  });
+
+  it('denies text longer than 2000 characters on edit', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({ text: 'x'.repeat(2001) })));
+  });
+
+  it('denies editing someone else\u2019s review', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({})));
+  });
+
+  // Proves the new hasProfile() clause. Account deletion creates exactly this
+  // state: the profile is gone but the session token has not expired yet.
+  it('denies editing once the author\u2019s profile is gone', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), 'users', ALICE));
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'reviews', aliceReview), edit({})));
+  });
+});
+
+describe('reviews: buildingId and the create gaps', () => {
+  const aliceReview = `${RESTROOM_ID}_${ALICE}`;
+
+  /**
+   * The clause that makes buildingId mandatory. Omitting it used to be accepted
+   * — hasOnly() permits a subset — and then unchanged([... 'buildingId' ...])
+   * denied every later edit of that review FOREVER, because unchangedKeys()
+   * only contains keys present in both maps.
+   */
+  it('denies creating a review with no buildingId at all', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    const { buildingId: _omitted, ...withoutBuilding } = reviewDoc();
+    await assertFails(setDoc(doc(db, 'reviews', aliceReview), withoutBuilding));
+  });
+
+  // A restroom beside the lagoon belongs to no building and must still be
+  // reviewable — buildingId is nullable, just not absent.
+  it('allows a review with an explicitly null buildingId', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(setDoc(doc(db, 'reviews', aliceReview), reviewDoc({ buildingId: null })));
+  });
+
+  it('denies a non-integer rating', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(setDoc(doc(db, 'reviews', aliceReview), reviewDoc({ rating: 4.5 })));
+  });
+
+  // A rating-only review is a deliberate product decision, not an oversight.
+  // Pinned so nobody "tightens" the rule later.
+  it('allows a review with empty text', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(setDoc(doc(db, 'reviews', aliceReview), reviewDoc({ text: '' })));
+  });
+
+  it('denies a non-author deleting a review', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reviews', aliceReview), reviewDoc());
+    });
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(deleteDoc(doc(db, 'reviews', aliceReview)));
+  });
+});

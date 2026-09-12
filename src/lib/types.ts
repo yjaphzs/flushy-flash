@@ -85,7 +85,22 @@ export type Review = {
   /** Composite `${restroomId}_${uid}` — one review per user per restroom, enforced in rules. */
   id: string;
   restroomId: string;
-  buildingId: string;
+  /**
+   * Denormalised from the restroom at create time, and NULLABLE because a
+   * restroom's is — one beside the lagoon belongs to no building. Typing it
+   * `string` here would have pushed a null through the `as Review` cast
+   * silently.
+   *
+   * ⚠️ **It must be WRITTEN even when null.** `unchanged()` in firestore.rules
+   * is `diff().unchangedKeys().hasAll([...])`, and `unchangedKeys()` only
+   * contains keys present in BOTH maps — so a create that omits `buildingId`
+   * makes every future edit of that review permanently denied.
+   *
+   * Because the rules pin it, it stays whatever it was: re-snapping the
+   * restroom to another building later leaves this copy stale. That is required
+   * by the rules, not a bug.
+   */
+  buildingId: string | null;
   authorId: string;
   /** 1–5, validated server-side. */
   rating: number;

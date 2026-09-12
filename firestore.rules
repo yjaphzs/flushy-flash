@@ -202,15 +202,30 @@ service cloud.firestore {
         && incoming().text is string
         && incoming().text.size() <= 2000
         && isValidPhotoIds(incoming().photoIds)
+        // Requires buildingId to be PRESENT, and that is the point rather than a
+        // side effect: reading an absent map key is an evaluation error in
+        // rules, so this clause fails a create that omits it. Without it,
+        // hasOnly() happily accepts the omission and unchanged([... 'buildingId'
+        // ...]) below then denies EVERY future edit of that review, forever,
+        // with no way to fix it from the client.
+        && (incoming().buildingId == null || incoming().buildingId is string)
         && exists(/databases/$(database)/documents/restrooms/$(incoming().restroomId));
 
-      allow update: if isSelf(current().authorId)
+      // hasProfile() like every other write path in this file, including
+      // restrooms' own update. It mirrors useCanWrite() on the client, and
+      // closes the window where a profile is gone but the session is not —
+      // which is exactly what account deletion creates.
+      allow update: if hasProfile()
+        && isSelf(current().authorId)
         && unchanged(['restroomId', 'buildingId', 'authorId', 'createdAt'])
         && incoming().keys().hasOnly(reviewKeys())
         && isValidScore(incoming().rating)
         && isValidScore(incoming().cleanliness)
         && incoming().text is string
-        && incoming().text.size() <= 2000;
+        && incoming().text.size() <= 2000
+        // Create caps photos at five; update capped at NOTHING, which defeats
+        // the ceiling the cap exists for — and edit is the path used repeatedly.
+        && isValidPhotoIds(incoming().photoIds);
 
       allow delete: if isSelf(current().authorId) || isAdmin();
     }

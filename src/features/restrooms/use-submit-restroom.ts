@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 
 import { createRestroom, newRestroomId } from '@/features/restrooms/api';
-import { pickRestroomPhotos, MAX_PHOTOS, type PickedPhoto } from '@/features/restrooms/photos';
-import { deleteRestroomPhotos, uploadRestroomPhoto } from '@/lib/storage';
+import { pickPhotos, MAX_PHOTOS, type PickedPhoto } from '@/features/restrooms/photos';
+import { deletePhotos, uploadPhoto } from '@/lib/storage';
 import { firestoreErrorMessage } from '@/lib/firestore-errors';
 import type { LatLng } from '@/lib/campus';
 import type { Amenities, GenderedAs } from '@/lib/types';
@@ -60,8 +60,9 @@ export function useSubmitRestroom() {
     try {
       for (const [index, photo] of input.photos.entries()) {
         setProgress(`Uploading photo ${index + 1} of ${input.photos.length}…`);
-        const { path } = await uploadRestroomPhoto({
-          restroomId: id,
+        const { path } = await uploadPhoto({
+          folder: 'restrooms',
+          ownerId: id,
           uid: input.uid,
           uri: photo.uri,
           index,
@@ -85,7 +86,7 @@ export function useSubmitRestroom() {
     } catch (e) {
       // See the ordering note above: the document is what makes the photos
       // reachable, so if it never landed the photos must go.
-      if (uploaded.length > 0) await deleteRestroomPhotos(uploaded);
+      if (uploaded.length > 0) await deletePhotos(uploaded);
       setError(firestoreErrorMessage(e));
       return null;
     } finally {
@@ -94,5 +95,5 @@ export function useSubmitRestroom() {
     }
   }, []);
 
-  return { submit, busy, progress, error, maxPhotos: MAX_PHOTOS, pickPhotos: pickRestroomPhotos };
+  return { submit, busy, progress, error, maxPhotos: MAX_PHOTOS, pickPhotos };
 }
