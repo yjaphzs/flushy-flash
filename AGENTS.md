@@ -945,6 +945,7 @@ Three, each of which drifts silently. Change them together:
 | `src/components/common/gradient.tsx` | `FALLBACK`, light and dark sets. Only appears when uniwind cannot resolve a variable — which it reports as a `__DEV__` warning only, so a wrong value ships looking fine. |
 | `app.json` | splash `backgroundColor` / `dark.backgroundColor`, and `adaptiveIcon.backgroundColor` |
 | `src/components/common/brand-mark.tsx` | two `fill` fallbacks, sRGB copies of `--accent-foreground` (tile) and `--accent` (bare) |
+| `src/components/common/restroom-pin-body.tsx` | the map pin's `accent` fallback, an sRGB copy of `--accent`. Only appears if uniwind cannot resolve the variable — a `__DEV__` warning and nothing else, so a wrong value ships looking fine |
 | `src/components/common/map-style/palette.ts` | the whole map palette. Mostly colours with no app token (water, roads, buildings), so this is the honest home rather than a leak — but `campus` is brand-derived and `land` is load-bearing for the tab bar |
 | `app.json` splash `backgroundColor` / `dark` | must equal the resolved sRGB of `--background`, which `--color-splash-ground` aliases. Two seams depend on it: native→JS handoff and the fade that reveals the app |
 

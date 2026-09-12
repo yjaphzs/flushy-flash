@@ -19,7 +19,23 @@ const BUBBLE = {
 } as const;
 
 const CARD = { width: 140, photo: 80, caption: 26, radius: 16, tail: 10 } as const;
-const RING = 3;
+
+/**
+ * The frame is TWO rings, and that is not decoration.
+ *
+ * A single white ring is invisible on the light map — which is most of campus —
+ * so the pin dissolved into the background. A single accent ring sits straight
+ * against the photo and reads as a coloured smudge on a dark image. Accent
+ * outside for separation from the map, white inside to frame the photo, which
+ * is the same reason a physical print gets a mount.
+ *
+ * Drawn as backgroundColor + padding rather than nested borderWidths: Android
+ * rounds each border box independently and a 2px border inside another 2px
+ * border leaves visible corner artefacts at these radii.
+ */
+const FRAME_OUTER = 2;
+const FRAME_INNER = 2;
+const FRAME = FRAME_OUTER + FRAME_INNER;
 
 export type PinBodyProps = {
   shape: PinShape;
@@ -55,75 +71,107 @@ export type PinBodyProps = {
  * from the dark map underneath.
  */
 export function PinBody({ shape, photoUrl, label, selected, onPhotoDisplay }: PinBodyProps) {
-  const accent = useCSSVariable('--color-accent');
-  const ring = selected && typeof accent === 'string' ? accent : '#FFFFFF';
+  const resolved = useCSSVariable('--color-accent');
+  /**
+   * A fourth sRGB copy of --accent, and it is registered in AGENTS.md §14's
+   * duplicated-colours table. It only appears if uniwind cannot resolve the
+   * variable, which it reports as a __DEV__ warning and nothing else — so a
+   * wrong value here would ship looking fine.
+   */
+  const accent = typeof resolved === 'string' ? resolved : '#00855E';
+  // Selected fills the mount with the accent too, so the whole frame reads as
+  // one solid colour rather than changing a ring nobody was looking at.
+  const mount = selected ? accent : '#FFFFFF';
 
   if (shape === 'card') {
+    const contentW = CARD.width - FRAME * 2;
     return (
       <View className="items-center">
         <View
-          // `bg-background`, NOT `bg-surface`: --surface carries alpha (82% in
-          // light) because the glass theme depends on it, and a translucent
-          // caption strip would let map tiles bleed through the label. This is
-          // the one place in the app where that token would be actively wrong.
-          className="overflow-hidden bg-background"
           style={{
-            width: CARD.width,
+            backgroundColor: accent,
+            padding: FRAME_OUTER,
             borderRadius: CARD.radius,
             borderCurve: 'continuous',
-            borderWidth: RING,
-            borderColor: ring,
           }}
         >
-          <Photo
-            url={photoUrl}
-            width={CARD.width - RING * 2}
-            height={CARD.photo}
-            glyph={28}
-            onDisplay={onPhotoDisplay}
-          />
-          {/*
-            Fixed height and one line. A wrapping caption changes the view's
-            bounds, which changes the bitmap, which changes the anchor offset —
-            so a two-line landmark would make the pin visibly taller than its
-            neighbours for no gain.
-          */}
-          <View className="justify-center px-2" style={{ height: CARD.caption }}>
-            <Text type="body-xs" weight="medium" numberOfLines={1}>
-              {label}
-            </Text>
+          <View
+            style={{
+              backgroundColor: mount,
+              padding: FRAME_INNER,
+              borderRadius: CARD.radius - FRAME_OUTER,
+              borderCurve: 'continuous',
+            }}
+          >
+            <View
+              className="overflow-hidden bg-background"
+              style={{ borderRadius: CARD.radius - FRAME, borderCurve: 'continuous' }}
+            >
+              <Photo
+                url={photoUrl}
+                width={contentW}
+                height={CARD.photo}
+                glyph={28}
+                onDisplay={onPhotoDisplay}
+              />
+              {/*
+                Fixed height and one line. A wrapping caption changes the view's
+                bounds, which changes the bitmap, which changes the anchor
+                offset — so a two-line landmark would make the pin visibly
+                taller than its neighbours for no gain.
+              */}
+              <View
+                className="justify-center px-2"
+                style={{ height: CARD.caption, width: contentW }}
+              >
+                <Text type="body-xs" weight="medium" numberOfLines={1}>
+                  {label}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
-        <Tail size={CARD.tail} color={ring} />
+        <Tail size={CARD.tail} color={accent} />
       </View>
     );
   }
 
   const { size, tail } = BUBBLE[shape];
-  const inner = size - RING * 2;
+  const photo = size - FRAME * 2;
 
   return (
     <View className="items-center">
       <View
-        className="items-center justify-center overflow-hidden bg-accent"
         style={{
-          width: size,
-          height: size,
+          backgroundColor: accent,
+          padding: FRAME_OUTER,
           borderRadius: size / 2,
           borderCurve: 'continuous',
-          borderWidth: RING,
-          borderColor: ring,
         }}
       >
-        <Photo
-          url={photoUrl}
-          width={inner}
-          height={inner}
-          glyph={size > 50 ? 26 : 22}
-          onDisplay={onPhotoDisplay}
-        />
+        <View
+          style={{
+            backgroundColor: mount,
+            padding: FRAME_INNER,
+            borderRadius: (size - FRAME_OUTER * 2) / 2,
+            borderCurve: 'continuous',
+          }}
+        >
+          <View
+            className="items-center justify-center overflow-hidden bg-accent"
+            style={{ borderRadius: photo / 2, borderCurve: 'continuous' }}
+          >
+            <Photo
+              url={photoUrl}
+              width={photo}
+              height={photo}
+              glyph={size > 50 ? 24 : 20}
+              onDisplay={onPhotoDisplay}
+            />
+          </View>
+        </View>
       </View>
-      <Tail size={tail} color={ring} />
+      <Tail size={tail} color={accent} />
     </View>
   );
 }
@@ -183,6 +231,9 @@ function Tail({ size, color }: { size: number; color: string }) {
       style={{
         width: 0,
         height: 0,
+        // Pulled up by a pixel: the tail and the frame are the same colour and
+        // must read as one shape, and rounding can otherwise leave a hairline.
+        marginTop: -1,
         borderLeftWidth: size * 0.7,
         borderRightWidth: size * 0.7,
         borderTopWidth: size,
