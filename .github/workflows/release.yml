@@ -64,6 +64,28 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))" \
             || { echo "::error::Decoded google-services.json is not valid JSON."; exit 1; }
 
+      # Google Sign-In's web client id reaches the app as EXPO_PUBLIC_*, which
+      # Metro inlines when gradle bundles the JS — so it must be in the
+      # environment before assembleRelease, not merely at prebuild.
+      #
+      # DERIVED from google-services.json rather than carried as its own secret.
+      # It is the `client_type: 3` entry of the very file written above, it is
+      # not secret (it ships inside the APK either way), and deriving it means
+      # the two can never disagree after a new SHA-1 regenerates the config.
+      #
+      # Without it, env.googleWebClientId is '' and isGoogleSignInConfigured()
+      # hides the button. That failure is SILENT — nothing in the build warns —
+      # and it is how v1.0.0 shipped with no Google sign-in on the auth screens.
+      - name: Derive the Google web client id
+        run: |
+          ID=$(node -p "(JSON.parse(require('fs').readFileSync('google-services.json','utf8')).client[0].oauth_client.filter(function (o) { return o.client_type === 3; })[0] || {}).client_id || ''")
+          if [ -z "$ID" ]; then
+            echo "::error::google-services.json has no client_type 3 (web) OAuth client, so Google Sign-In would be hidden in the APK. Enable Google under Authentication, then refresh the GOOGLE_SERVICES_JSON secret with 'npm run firebase:sdkconfig'."
+            exit 1
+          fi
+          echo "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=$ID" >> "$GITHUB_ENV"
+          echo "Google web client id resolved: ${ID%%-*}-<redacted>"
+
       # expo prebuild reads app.json, so the version has to be set BEFORE it runs.
       # versionCode must increase monotonically or Android refuses the in-place
       # upgrade; run_number gives us that for free and never resets.
