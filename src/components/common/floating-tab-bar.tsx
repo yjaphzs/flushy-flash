@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 
 import { GlassSurface } from '@/components/common/glass-surface';
+import { BrandGradient } from '@/components/common/gradient';
 import { TabBarItem } from '@/components/common/tab-bar-item';
 import {
   TAB_BAR_HEIGHT,
@@ -167,9 +168,14 @@ export function FloatingTabBar({
       />
 
       {/*
-        ONE highlight for the whole bar, travelling between items. No ring: the
-        darker accent clears WCAG 1.4.11 against the pill unaided (4.54:1 light,
-        3.20:1 dark), so the old 1px dark border was a halo with no job.
+        ONE highlight for the whole bar, travelling between items. No ring HERE:
+        the darker accent clears WCAG 1.4.11 against the pill unaided (4.54:1
+        light, 3.20:1 dark), so the old 1px dark border was a halo with no job.
+
+        ⚠️ That argument is specific to a FLAT fill, and the centre action no
+        longer has one — its gradient is pale at one end (1.52:1 against the
+        light pill), so it carries a ring of its own. Do not delete that one on
+        the strength of this note.
 
         `left: 0` plus translateX, never an animated `left` — a transform stays
         on the UI thread, a layout prop does not.
@@ -201,13 +207,31 @@ export function FloatingTabBar({
         testID="find-nearest"
         className="mx-1.5"
       >
+        {/*
+          The gradient fill, plus a ring — two separate fixes for two separate
+          measured problems, not belt-and-braces.
+
+          The RING exists because the ramp's pale end is 1.52:1 against the
+          light pill, where the flat accent it replaced was 4.54:1. Without it
+          the button's lower-right edge dissolves into the pill in light mode.
+
+          ⚠️ This re-adds the ring the bar deliberately removed below as "a halo
+          with no job" — and that reasoning was right for a FLAT accent fill,
+          which clears 1.4.11 unaided. It does not survive a ramp that is pale
+          at one end. The note on the highlight has been corrected to say so.
+
+          The gradient itself is `action`, whose stops are biased so the glyph
+          sits over #008F6A (white 4.09:1) rather than the mint middle
+          (2.16:1). See gradient.tsx.
+        */}
         <Animated.View
-          className="items-center justify-center bg-accent"
+          className="items-center justify-center overflow-hidden border border-accent"
           style={[
             actionStyle,
             { width: ACTION, height: ACTION, borderRadius: 8, borderCurve: 'continuous' },
           ]}
         >
+          <BrandGradient variant="action" />
           <Icon name="sparkles" size={24} color="on-accent" strokeWidth={2.25} />
         </Animated.View>
       </Pressable>

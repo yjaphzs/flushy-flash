@@ -78,6 +78,20 @@
   --color-brand-grad-to: var(--brand-grad-to);
   --color-brand-grad-anchor: var(--brand-grad-anchor);
 
+  /* The nav centre button's ramp. Scheme-INDEPENDENT, unlike every other
+   * colour in this file, and that is the point rather than an oversight.
+   *
+   * --brand-grad-* runs the opposite way in dark: its stops descend to
+   * near-black so a 55%-opaque glass card over them keeps --muted and
+   * --danger above AA. Correct for a full-bleed backdrop, and wrong for a
+   * 52pt button, which would render as a black square on a dark pill.
+   *
+   * The button is not a backdrop and carries no text, so it wants the brand
+   * ramp as specified, in both schemes. */
+  --color-nav-from: var(--nav-from);
+  --color-nav-via: var(--nav-via);
+  --color-nav-to: var(--nav-to);
+
   /* The ONE deliberate exception to "never set --color-*" above.
    *
    * heroui derives this as color-mix(in oklab, accent 80%, foreground 20%) and
@@ -197,6 +211,11 @@
     --brand-grad-from: oklch(57.67% 0.1186 166.75);
     --brand-grad-via: oklch(73.89% 0.1615 162.24);
     --brand-grad-to: oklch(83.77% 0.1437 164.81);
+    /* #008F6A -> #00C98B -> #5BE7B2, the brand ramp as specified. Identical
+       in the dark block below - see the alias comment above for why. */
+    --nav-from: oklch(57.67% 0.1186 166.75);
+    --nav-via: oklch(73.89% 0.1615 162.24);
+    --nav-to: oklch(83.77% 0.1437 164.81);
   }
 
   @variant dark {
@@ -267,5 +286,10 @@
     --brand-grad-from: oklch(32% 0.068 168);
     --brand-grad-via: oklch(23% 0.048 170);
     --brand-grad-to: oklch(17% 0.03 172);
+    /* Deliberately the SAME values as light. The button must stay mint on a
+       dark pill, where #5BE7B2 measures 9.58:1 against it. */
+    --nav-from: oklch(57.67% 0.1186 166.75);
+    --nav-via: oklch(73.89% 0.1615 162.24);
+    --nav-to: oklch(83.77% 0.1437 164.81);
   }
 }
