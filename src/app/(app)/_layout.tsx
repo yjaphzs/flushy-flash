@@ -57,6 +57,22 @@ export default function AppLayout() {
             sheetGrabberVisible: true,
           }}
         />
+        {/*
+          fullScreenModal, not a push — and the distinction is not cosmetic.
+
+          `/submit` is itself `presentation: 'modal'`, which on iOS is a page
+          sheet with a gap at the top. A default push lands INSIDE that sheet,
+          so the "full-screen" placer would be a 90%-height card with the map's
+          top edge cut off — the exact problem it exists to fix.
+
+          It is also a SIBLING route rather than anything that replaces
+          `/submit`, so the form stays mounted underneath and keeps its picked
+          photos (local file URIs) across the round trip.
+        */}
+        <Stack.Screen
+          name="pick-location"
+          options={{ presentation: 'fullScreenModal', title: 'Where is it?' }}
+        />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       </Stack>
       <UpdateDialog />

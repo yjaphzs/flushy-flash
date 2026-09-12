@@ -89,3 +89,17 @@ export const SCREEN_TOP_GAP = 12;
 export function useScreenTopClearance(): number {
   return useTopInset() + SCREEN_TOP_GAP;
 }
+
+/**
+ * Window bottom to where content may safely end when there is NO floating bar.
+ *
+ * A full-screen modal covers the tab stack, so the pill is not on screen and
+ * `useTabBarClearance()` would reserve 88pt for something that is not there.
+ * There is still a home indicator, so raw 0 is wrong too.
+ *
+ * Deliberately not `useTabBarOffset()`, whose own docblock reserves it for the
+ * bar and anything pinned directly above it.
+ */
+export function useBottomInset(): number {
+  return useSafeAreaInsets().bottom;
+}

@@ -121,6 +121,13 @@ export function ScreenScrollView({
           caller passing its own paddingTop still wins over both.
         */
         contentContainerStyle={[{ paddingTop }, contentContainerStyle]}
+        /*
+          ⚠️ `topInset={false}` has to switch this off too, or it only half
+          works: it disabled the Android pad while this stayed 'automatic', so a
+          full-bleed screen still got an iOS-only band of background above its
+          backdrop — the exact failure the Screen docblock describes.
+        */
+        contentInsetAdjustmentBehavior={topInset ? 'automatic' : 'never'}
         keyboardShouldPersistTaps={keyboardShouldPersistTaps}
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets={avoidsKeyboard}

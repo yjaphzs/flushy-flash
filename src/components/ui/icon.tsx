@@ -5,6 +5,7 @@ import Bell from 'lucide-react-native/icons/bell';
 import Check from 'lucide-react-native/icons/check';
 import Clock from 'lucide-react-native/icons/clock';
 import ChevronLeft from 'lucide-react-native/icons/chevron-left';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleAlert from 'lucide-react-native/icons/circle-alert';
 import Droplet from 'lucide-react-native/icons/droplet';
 import Eye from 'lucide-react-native/icons/eye';
@@ -14,6 +15,7 @@ import ImageIcon from 'lucide-react-native/icons/image';
 import Lock from 'lucide-react-native/icons/lock';
 import Mail from 'lucide-react-native/icons/mail';
 import MapGlyph from 'lucide-react-native/icons/map';
+import LocateFixed from 'lucide-react-native/icons/locate-fixed';
 import MapPin from 'lucide-react-native/icons/map-pin';
 import Plus from 'lucide-react-native/icons/plus';
 import ScrollText from 'lucide-react-native/icons/scroll-text';
@@ -51,6 +53,7 @@ export type IconName =
   | 'eye'
   | 'eye-off'
   | 'chevron-left'
+  | 'chevron-right'
   | 'check'
   | 'x'
   | 'alert-circle'
@@ -59,6 +62,7 @@ export type IconName =
   | 'bell'
   | 'map'
   | 'map-pin'
+  | 'locate-fixed'
   | 'user-round'
   | 'sparkles'
   | 'star'
@@ -89,6 +93,7 @@ const GLYPHS: Record<IconName, Glyph> = {
   eye: Eye,
   'eye-off': EyeOff,
   'chevron-left': ChevronLeft,
+  'chevron-right': ChevronRight,
   check: Check,
   x: XMark,
   'alert-circle': CircleAlert,
@@ -97,6 +102,7 @@ const GLYPHS: Record<IconName, Glyph> = {
   bell: Bell,
   map: MapGlyph,
   'map-pin': MapPin,
+  'locate-fixed': LocateFixed,
   'user-round': UserRound,
   sparkles: Sparkles,
   star: Star,

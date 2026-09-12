@@ -40,6 +40,15 @@ export const MIN_ZOOM = 14;
 export const MAX_ZOOM = 19;
 
 /**
+ * Where the pin placer opens.
+ *
+ * Closer than INITIAL_ZOOM because placing a pin on a doorway is a different
+ * task from finding your bearings on campus. A constant rather than a literal
+ * in the component, so it sits beside the zooms it has to stay consistent with.
+ */
+export const PLACER_ZOOM = 18;
+
+/**
  * Earns the "verified student" badge when an address on this domain is confirmed.
  * Enforced server-side in firestore.rules against the auth token's own claims —
  * this constant only drives client-side copy and hints.

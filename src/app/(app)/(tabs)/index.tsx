@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
+  ATTRIBUTION_LEFT,
   CAMPUS_MAX_BOUNDS,
   Map,
   MapCamera,
   MapUserLocation,
+  ORNAMENT_LEFT,
   fromLngLatBounds,
   type MapBounds,
   type MapCameraRef,
@@ -146,9 +148,9 @@ export default function MapScreen() {
 
            OrnamentViewPosition requires one vertical AND one horizontal key, so
            these cannot be nudged on a single axis. */
-        logoPosition={{ bottom: clearance, left: 12 }}
-        attributionPosition={{ bottom: clearance, left: 44 }}
-        compassPosition={{ bottom: clearance + 44, left: 12 }}
+        logoPosition={{ bottom: clearance, left: ORNAMENT_LEFT }}
+        attributionPosition={{ bottom: clearance, left: ATTRIBUTION_LEFT }}
+        compassPosition={{ bottom: clearance + 44, left: ORNAMENT_LEFT }}
         onRegionDidChange={onRegionDidChange}
       >
         <MapCamera ref={camera} {...campusCameraProps} maxBounds={CAMPUS_MAX_BOUNDS} />

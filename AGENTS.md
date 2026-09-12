@@ -817,10 +817,18 @@ fan-out-on-read query ships it belongs as a Following segment on Profile, not a
 primary tab.
 
 **Restrooms are the map's unit, not buildings.** Each carries its own
-`location`, placed by hand in `components/common/pin-picker.tsx` — a pin fixed at
-screen centre with the map panning beneath it, opening on the user's fix.
-MapLibre's only draggable annotation rasterises its children on Android, so a
-fixed centre is both more robust and the pattern every place-picker uses.
+`location`, placed by hand on a FULL-SCREEN placer, `app/(app)/pick-location.tsx`
+— a pin fixed at screen centre with the map panning beneath it. MapLibre's only
+draggable annotation rasterises its children on Android, so a fixed centre is
+both more robust and the pattern every place-picker uses.
+
+It used to be a 280pt map embedded in the submit form, which put a pan gesture
+inside a ScrollView and left almost no room to aim. The placer is a
+`fullScreenModal` SIBLING of `/submit` rather than a replacement, because the
+form holds picked photos as local file URIs and must not unmount; the chosen
+point returns through `stores/pin-draft-store.ts`, whose nonce is read during
+RENDER rather than in an effect. The form then shows a rendered PNG thumbnail
+(`StaticMapImageManager`), not a second GL surface.
 
 The ~95 seeded OSM buildings **no longer draw a pin**. They are a label snapped
 from the dropped pin within ~80 m, and nullable. The visible consequence is that

@@ -80,6 +80,26 @@ export type MapViewAnnotationRef = React.ComponentRef<typeof MLViewAnnotation>;
  */
 export type { ViewState, ViewStateChangeEvent };
 
+/**
+ * Off-screen snapshotter: renders a map to a PNG and hands back a file URI.
+ *
+ * Part of the already-autolinked package, so this costs no new dependency and
+ * no prebuild. It is what lets the submit form show a map thumbnail without a
+ * SECOND live GL surface — every `<Map>` is a real GL context, a second style
+ * parse and a second tile session, composited on every scroll frame.
+ *
+ * ⚠️ **Its Android error path never settles the promise.** `MLRNStaticMapModule.kt`
+ * handles failure with `{ error -> Log.w(NAME, error); snapshotterMap.remove(id) }`
+ * — it logs and drops. `promise.reject` is only reached when the bitmap
+ * converts to null on SUCCESS. A style or tile failure therefore leaves the
+ * await pending forever. Always race it against a timeout;
+ * `features/restrooms/use-static-map.ts` is the wrapper that does.
+ */
+export { StaticMapImageManager } from '@maplibre/maplibre-react-native';
+
+/** `contentInset` — shifts the logical viewport so a footer does not lie about the centre. */
+export type { ViewPadding } from '@maplibre/maplibre-react-native';
+
 /** MapLibre takes [lng, lat]; our domain types use { lat, lng }. Convert here, once. */
 export const toLngLat = (p: { lat: number; lng: number }): LngLat => [p.lng, p.lat];
 
@@ -115,6 +135,23 @@ export const campusCameraProps = {
   maxZoom: MAX_ZOOM,
   maxBounds: CAMPUS_MAX_BOUNDS,
 } as const;
+
+/**
+ * Left edge of the MapLibre ornaments, and of the attribution “ⓘ” beside them.
+ *
+ * ⚠️ **These two are NOT 32 apart, however much it looks like they should be.**
+ * The MapLibre wordmark measures ~78dp wide, so an attribution at `left: 44`
+ * lands ON TOP of it — verified on device, where the ⓘ sat over the “p” of
+ * “MapLibre” and neither was readable. OSM attribution is a LICENCE condition,
+ * not chrome, so it has to be legible rather than merely present.
+ *
+ * Both screens that draw a map use these; the vertical half differs per screen
+ * (the pill on the map tab, the footer on the placer) and stays at the call
+ * site, because `OrnamentViewPosition` needs a vertical AND a horizontal key
+ * and so cannot be nudged on one axis.
+ */
+export const ORNAMENT_LEFT = 12;
+export const ATTRIBUTION_LEFT = 100;
 
 /**
  * The stock OpenFreeMap style URL, still env-driven. Kept as the documented

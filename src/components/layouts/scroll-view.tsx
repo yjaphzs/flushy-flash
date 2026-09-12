@@ -12,6 +12,10 @@ export type ScrollViewProps = Pick<
   | 'className'
   | 'contentContainerClassName'
   | 'contentContainerStyle'
+  // Overridable so `topInset={false}` can mean the same thing on both
+  // platforms. Hardcoding 'automatic' here left a full-bleed screen with an
+  // iOS-only band of background above it.
+  | 'contentInsetAdjustmentBehavior'
   | 'refreshControl'
   | 'keyboardShouldPersistTaps'
   | 'testID'

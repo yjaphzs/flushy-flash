@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
-import { PinPicker } from '@/components/common/pin-picker';
+import { PinField } from '@/features/restrooms/components/pin-field';
 import { PhotoPicker } from '@/features/restrooms/components/photo-picker';
 import { FormScreen } from '@/components/layouts/form-screen';
 import { Text } from '@/components/ui/text';
@@ -22,7 +22,12 @@ import { JoinBenefits } from '@/features/auth/components/join-benefits';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useBuildings } from '@/stores/campus-store';
-import { sortByDistance } from '@/lib/geo';
+import {
+  usePinDraftNonce,
+  usePinDraftPoint,
+  usePinDraftStore,
+} from '@/stores/pin-draft-store';
+import { snapBuilding } from '@/features/restrooms/snap-building';
 import type { LatLng } from '@/lib/campus';
 import type { Amenities, GenderedAs } from '@/lib/types';
 
@@ -42,9 +47,6 @@ const ACCESS: { value: GenderedAs; label: string }[] = [
   { value: 'accessible_only', label: 'Accessible only' },
 ];
 
-/** Beyond this the "nearest building" guess is noise, so offer none. */
-const BUILDING_SNAP_M = 80;
-
 export default function SubmitRestroomScreen() {
   const buildings = useBuildings();
   const uid = useUid();
@@ -52,7 +54,6 @@ export default function SubmitRestroomScreen() {
   const requestWrite = useRequestWrite();
   const form = useSubmitRestroom();
 
-  const [point, setPoint] = useState<LatLng | null>(null);
   const [floor, setFloor] = useState('1');
   const [landmark, setLandmark] = useState('');
   const [locationNote, setLocationNote] = useState('');
@@ -64,19 +65,31 @@ export default function SubmitRestroomScreen() {
   const [photos, setPhotos] = useState<ComposerPhoto[]>([]);
 
   /**
-   * The building is a LABEL derived from the pin, not something to choose from a
-   * list of 95. Snapping to the nearest one within ~80 m is right far more often
-   * than not, and being wrong costs nothing — buildingId is nullable now.
+   * The pin comes back from the full-screen placer through a store, and is read
+   * HERE, during render.
+   *
+   * Adjusting state in the render body rather than an effect is deliberate:
+   * React re-runs this render immediately and never paints the in-between,
+   * whereas an effect would show one frame carrying the stale pin. AGENTS.md §8
+   * bans useEffect + router.push, and this is the shape that needs neither.
+   *
+   * Both counters start at 0, so nothing fires on first mount, and backing out
+   * of the placer never moves the nonce.
    */
-  const nearestBuilding = useMemo(() => {
-    if (!point || buildings.length === 0) return null;
-    const [closest] = sortByDistance(buildings, point, (b) => ({
-      lat: b.location.latitude,
-      lng: b.location.longitude,
-    }));
-    if (!closest || closest.distanceM === null || closest.distanceM > BUILDING_SNAP_M) return null;
-    return closest.item;
-  }, [point, buildings]);
+  const draftPoint = usePinDraftPoint();
+  const draftNonce = usePinDraftNonce();
+  const [seenNonce, setSeenNonce] = useState(0);
+  const [point, setPoint] = useState<LatLng | null>(null);
+
+  if (draftNonce !== seenNonce) {
+    setSeenNonce(draftNonce);
+    setPoint(draftPoint);
+  }
+
+  // Cleanup, not navigation — a later composer must not inherit this pin.
+  useEffect(() => () => usePinDraftStore.getState().reset(), []);
+
+  const nearestBuilding = snapBuilding(point, buildings);
 
   async function onSubmit() {
     if (!uid) return;
@@ -106,13 +119,7 @@ export default function SubmitRestroomScreen() {
       onBack={() => router.back()}
       avoidsKeyboard
     >
-      <View className="gap-2">
-        <Text type="h4">Where is it?</Text>
-        <PinPicker onChange={setPoint} />
-        <Text type="body-xs" color="muted">
-          {nearestBuilding ? `Looks like ${nearestBuilding.name}.` : 'Not near a mapped building.'}
-        </Text>
-      </View>
+      <PinField point={point} building={nearestBuilding} />
 
       <PhotoPicker
         photos={photos}
