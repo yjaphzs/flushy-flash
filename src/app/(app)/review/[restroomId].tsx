@@ -138,7 +138,24 @@ export default function WriteReviewScreen() {
 
       {canWrite && !form.loading ? (
         <>
-          <ScorePicker label="Overall" value={form.rating} onChange={form.setRating} />
+          {/*
+            Overall is the headline question and is drawn as one — larger stars,
+            a bigger label, its own hint. Cleanliness sits beneath as a detail.
+            Two identically-sized pickers read as a survey rather than as a
+            rating with a follow-up.
+
+            Both are still REQUIRED: firestore.rules calls
+            isValidScore(incoming().cleanliness), and reading an absent map key
+            is an evaluation error in rules — so a write that omits it is
+            denied, not merely unvalidated. Emphasis is presentation only.
+          */}
+          <ScorePicker
+            label="Overall"
+            value={form.rating}
+            onChange={form.setRating}
+            emphasis="primary"
+            hint="Would you send a friend here?"
+          />
           <ScorePicker
             label="Cleanliness"
             value={form.cleanliness}

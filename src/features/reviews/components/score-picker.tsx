@@ -9,6 +9,16 @@ export type ScorePickerProps = {
   label: string;
   value: number;
   onChange: (value: number) => void;
+  /**
+   * The headline question, drawn larger.
+   *
+   * Overall and Cleanliness used to be two identical controls, which read as
+   * two equal questions and made the form feel like a survey. Overall is the
+   * one every review must answer; cleanliness is a useful detail beneath it.
+   */
+  emphasis?: 'primary' | 'secondary';
+  /** Optional one-line hint under the stars. */
+  hint?: string;
 };
 
 /**
@@ -27,11 +37,21 @@ export type ScorePickerProps = {
  * rating is required by the rules (`isValidScore` is 1–5, with no null), so
  * "unset" is not a state a saved review can be in.
  */
-export function ScorePicker({ label, value, onChange }: ScorePickerProps) {
+export function ScorePicker({
+  label,
+  value,
+  onChange,
+  emphasis = 'secondary',
+  hint,
+}: ScorePickerProps) {
+  const primary = emphasis === 'primary';
+  const star = primary ? 34 : 24;
+  const target = primary ? 'h-14 w-14' : 'h-11 w-11';
+
   return (
     <View className="gap-2">
       <View className="flex-row items-baseline justify-between">
-        <Text type="body" weight="semibold">
+        <Text type={primary ? 'h4' : 'body'} weight="semibold">
           {label}
         </Text>
         <Text type="body-sm" color="muted">
@@ -51,13 +71,24 @@ export function ScorePicker({ label, value, onChange }: ScorePickerProps) {
               accessibilityLabel={`${label}: ${step} out of ${MAX}`}
               accessibilityState={{ selected: on }}
               hitSlop={8}
-              className="h-11 w-11 items-center justify-center"
+              className={`${target} items-center justify-center`}
             >
-              <Icon name="star" size={26} filled={on} color={on ? 'accent' : 'field-placeholder'} />
+              <Icon
+                name="star"
+                size={star}
+                filled={on}
+                color={on ? 'accent' : 'field-placeholder'}
+              />
             </Pressable>
           );
         })}
       </View>
+
+      {hint ? (
+        <Text type="body-xs" color="muted">
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 }
