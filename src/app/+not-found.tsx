@@ -7,7 +7,7 @@ export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Not found' }} />
-      <ScreenScrollView contentContainerClassName="px-5 py-24 gap-3 items-center">
+      <ScreenScrollView topInset={false} contentContainerClassName="px-5 py-24 gap-3 items-center">
         <Text className="text-lg font-semibold">This screen does not exist.</Text>
         <Link href="/">
           <Text className="text-link">Go to the map</Text>

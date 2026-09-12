@@ -45,9 +45,17 @@ export default function MapScreen() {
     camera.current?.flyTo({ center: [focus.lng, focus.lat], zoom: 18, duration: 900 });
   }, [focus]);
   const restrooms = useRestrooms();
-  // The pin tap opens a sheet rather than navigating: the map stays behind it,
-  // which is the whole point of a sheet over a page.
-  const [selected, setSelected] = useState<string | null>(null);
+  /**
+   * The pin tap opens a sheet rather than navigating: the map stays behind it,
+   * which is the whole point of a sheet over a page.
+   *
+   * TWO pieces of state, not one, and the split is deliberate. Closing clears
+   * only `sheetOpen` and leaves `selectedId` alone, so the sheet keeps rendering
+   * its restroom through the close animation instead of blanking to an empty
+   * card halfway down. The next tap overwrites the id.
+   */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   /**
    * RESTROOMS are the map's unit now, not buildings.
@@ -65,7 +73,10 @@ export default function MapScreen() {
   const pins = useMemo(() => restrooms.filter((r) => r.location), [restrooms]);
 
   return (
-    <Screen>
+    // Full-bleed: the map draws to every edge and positions its own banners and
+    // ornaments against the insets. Padding it would leave a band of background
+    // above the tiles.
+    <Screen topInset={false}>
       <Map
         style={{ flex: 1 }}
         mapStyle={mapStyle}
@@ -96,7 +107,10 @@ export default function MapScreen() {
           <RestroomPinWithPhoto
             key={restroom.id}
             restroom={restroom}
-            onPress={() => setSelected(restroom.id)}
+            onPress={() => {
+              setSelectedId(restroom.id);
+              setSheetOpen(true);
+            }}
           />
         ))}
       </Map>
@@ -126,13 +140,21 @@ export default function MapScreen() {
 
       <SearchingDialog />
 
+      {/*
+        Rendered unconditionally, and that is load-bearing rather than untidy —
+        heroui's sheet only opens on a false → true transition, so a sheet that
+        mounts when a pin is tapped never opens at all. See restroom-sheet.tsx.
+      */}
       <RestroomSheet
-        restroom={pins.find((r) => r.id === selected) ?? null}
+        isOpen={sheetOpen}
+        // Derived live rather than captured, so a snapshot update to the open
+        // restroom reaches the sheet.
+        restroom={pins.find((r) => r.id === selectedId) ?? null}
         // The viewer's own last fix — NOT `focus`, which is the camera target
         // that "find nearest" flew to. Using that would measure the distance
         // from the restroom to itself.
         origin={lastKnownPoint()}
-        onClose={() => setSelected(null)}
+        onClose={() => setSheetOpen(false)}
       />
     </Screen>
   );

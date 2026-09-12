@@ -50,9 +50,16 @@ export function usePhotoUrl(path: string | undefined): string | null {
       .then((url) => {
         if (live) setEntry({ path, url });
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         // A missing photo is not worth a visible error: the pin falls back to
         // its glyph and the strip shows one fewer image.
+        //
+        // But swallowing it silently in DEV made three very different faults —
+        // a bucket misconfiguration, emulator routing pointing at the wrong
+        // host, and an object that genuinely does not exist — all look
+        // identical to "this restroom has no photos yet". One line to tell them
+        // apart; still nothing user-visible in production.
+        if (__DEV__) console.warn('[photo] could not resolve', path, e);
       });
     return () => {
       live = false;

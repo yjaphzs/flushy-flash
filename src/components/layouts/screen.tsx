@@ -1,7 +1,27 @@
+import { Platform } from 'react-native';
+
 import type { ViewProps } from '@/components/ui/view';
 import { View } from '@/components/ui/view';
 import type { ScrollViewProps } from '@/components/layouts/scroll-view';
 import { ScrollView } from '@/components/layouts/scroll-view';
+import { useScreenTopClearance } from '@/components/layouts/tab-bar-metrics';
+
+/**
+ * Android's missing top inset.
+ *
+ * Returns 0 on iOS, where `contentInsetAdjustmentBehavior` already supplies it
+ * and doing it twice would double-pad every screen. See
+ * `useScreenTopClearance()` for why only one platform needs this.
+ *
+ * Both components below apply it *inside* their outer `View` rather than on it,
+ * because an absolutely-positioned child is laid out against its parent's
+ * PADDING box — so padding the wrapper would push a full-bleed `backdrop`
+ * gradient down and leave a band of bare background above it.
+ */
+function useAndroidTopPad(enabled: boolean): number {
+  const clearance = useScreenTopClearance();
+  return enabled && Platform.OS === 'android' ? clearance : 0;
+}
 
 /** Full-bleed screen container — use for the map, which is not a ScrollView. */
 export function Screen({
@@ -9,6 +29,7 @@ export function Screen({
   className,
   style,
   backdrop,
+  topInset = true,
   testID,
 }: {
   children: React.ReactNode;
@@ -21,12 +42,28 @@ export function Screen({
   style?: ViewProps['style'];
   /** Absolutely-positioned layer behind the content, e.g. <BrandGradient />. */
   backdrop?: React.ReactNode;
+  /**
+   * Opt out when the screen is genuinely full-bleed and positions its own
+   * chrome against the inset — the map does exactly that, and padding it would
+   * leave a band of background above the tiles.
+   */
+  topInset?: boolean;
   testID?: string;
 }) {
+  const paddingTop = useAndroidTopPad(topInset);
+
   return (
     <View className={className ?? 'flex-1 bg-background'} style={style} testID={testID}>
+      {/*
+        The backdrop stays OUTSIDE the padded box. An absolutely-positioned child
+        is laid out against its parent's padding box, so padding the wrapper
+        would push a full-bleed gradient down and leave a band of bare
+        background above it.
+      */}
       {backdrop ?? null}
-      {children}
+      <View className="flex-1" style={{ paddingTop }}>
+        {children}
+      </View>
     </View>
   );
 }
@@ -47,6 +84,7 @@ export function ScreenScrollView({
   backdrop,
   avoidsKeyboard = false,
   keyboardShouldPersistTaps = 'handled',
+  topInset = true,
   testID,
 }: {
   children: React.ReactNode;
@@ -62,15 +100,27 @@ export function ScreenScrollView({
   backdrop?: React.ReactNode;
   avoidsKeyboard?: boolean;
   keyboardShouldPersistTaps?: 'always' | 'never' | 'handled';
+  /** Opt out under a native header, which already supplies the offset. */
+  topInset?: boolean;
   testID?: string;
 }) {
+  const paddingTop = useAndroidTopPad(topInset);
+
   return (
+    // No padding here — the backdrop is absolutely positioned against this box
+    // and must stay full-bleed. The inset goes on the content container.
     <View className="flex-1 bg-background">
       {backdrop ?? null}
       <ScrollView
         className={className ?? 'flex-1 bg-background'}
         contentContainerClassName={contentContainerClassName ?? 'px-4 py-3 gap-3'}
-        contentContainerStyle={contentContainerStyle}
+        /*
+          Order matters. Uniwind composes this as [classNameStyles, style], so
+          our paddingTop supersedes the `py-*` top half — deliberately, since the
+          inset is strictly larger than the 12-24px those classes set — while a
+          caller passing its own paddingTop still wins over both.
+        */
+        contentContainerStyle={[{ paddingTop }, contentContainerStyle]}
         keyboardShouldPersistTaps={keyboardShouldPersistTaps}
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets={avoidsKeyboard}

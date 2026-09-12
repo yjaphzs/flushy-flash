@@ -104,9 +104,15 @@ in `src/app/_layout.tsx`: a rule with a carve-out is a rule people stop trusting
   `.map()` is banned for data lists. Fixed chrome — a handful of benefit rows, a
   set of amenity toggles — is a plain `.map()` in a `View` and always has been.
 - **Images go through `@/components/ui/image`** (expo-image), never RN's `Image`.
-- **Safe area** comes from `contentInsetAdjustmentBehavior="automatic"`, not
-  `SafeAreaView` or manual insets. The floating tab bar is the one exception, and
-  it has its own rule below.
+- **Safe area.** ⚠️ `contentInsetAdjustmentBehavior="automatic"` is
+  **iOS-only** — RN 0.86.3 declares it `@platform ios` (ScrollView.js:319-325) and
+  Android drops it, while also running edge-to-edge with a transparent status bar.
+  Every Android screen therefore had a top inset of exactly ZERO until
+  `useScreenTopClearance()` existed. **`Screen` and `ScreenScrollView` now apply it
+  on Android and nothing else should** — pass `topInset={false}` on a screen that
+  sits under a native header (it already supplies the offset) or is deliberately
+  full-bleed (the map). Never `SafeAreaView`, never a raw `useSafeAreaInsets()`
+  outside `layouts/`.
 - **Bottom clearance has exactly one source: `components/layouts/tab-bar-metrics.ts`.**
   The tab bar floats over the content, so nothing pads a tab screen automatically
   any more. **Adding a tab screen means adding the inset** — `useTabBarClearance()`
@@ -191,7 +197,7 @@ These cost round trips once. Don't rediscover them.
 | `Button isIconOnly` | heroui adds `aspect-ratio: 1`, so the button becomes a square of its SIZE's height: `sm` is **40pt — under the 44pt minimum touch target**, `md` is 48, `lg` is 56. A label hides this by making `sm` wide enough. Also: the wrapper derives no `accessibilityLabel` from `Button.Label` and warns about nothing, so icon-only means you must pass one |
 | Photo encoding | **WebP at 0.9**, not JPEG. Lossless (PNG) on a photograph runs 3-6 MB against storage.rules' 8 MB ceiling — lossless is for line art. WebP is smaller than the old JPEG *and* better looking. `photos.ts` (`SaveFormat.WEBP`), `storage.ts` (`CONTENT_TYPE`, and the object extension) must agree: the rules check the ASSERTED contentType, so a mismatched pair passes the rule and confuses every consumer |
 | Storage uploads | `metadata.uploadedBy` **must** equal the caller's uid — `declaresUploader()` in `storage.rules` compares them on every create, and omitting it is a flat `permission-denied` with no hint which clause failed. Objects are immutable (`allow update: if false`), so "replace a photo" means a new id. `FirebaseStorageTypes` is **gone** in v26, like the auth and firestore namespaces |
-| Map pins | Three APIs, and the choice matters. `Marker` keeps a live RN view per point and its own docs call it the expensive one; `ViewAnnotation` is for STATIC content; `GeoJSONSource` + symbol layer is cheapest but needs images pre-registered in the style sprite, so it cannot show a remote photo. Restroom pins use **`ViewAnnotation`**. ⚠️ **Android rasterises its children into a bitmap**, so an image that has not decoded yet bakes in blank, permanently, with no error — call `ViewAnnotationRef.refresh()` from the image's `onLoad`, which is what the library's own doc comment tells you to do. It is why `ui/image.tsx` exposes `onLoad` |
+| Map pins | Three APIs, and the choice matters. `Marker` keeps a live RN view per point and its own docs call it the expensive one; `ViewAnnotation` is for STATIC content; `GeoJSONSource` + symbol layer is cheapest but needs images pre-registered in the style sprite, so it cannot show a remote photo. Restroom pins use **`ViewAnnotation`**. ⚠️ **Android rasterises its children into a bitmap**, so an image that has not decoded yet bakes in blank, permanently, with no error — call `ViewAnnotationRef.refresh()` from the image's **`onDisplay`**, paired with **`transition={0}`**. ⚠️ **The library's own doc comment says `onLoad`, and that advice does not work**: expo-image fires `onLoad` from Glide's `RequestListener.onResourceReady`, BEFORE the drawable is attached to the view, and the view is then faded in from `alpha = 0`. `BitmapUtils.viewToBitmap` is a software `draw()` that honours alpha, so a refresh there captures an empty transparent view — the exact blank pin. `onDisplay` is dispatched after attach. Also: `elevation` does NOT survive `v.draw(canvas)`, so a pin can have no drop shadow |
 | MapLibre style | `mapStyle` is `string \| StyleSpecification` — it takes a style **object**, which is how `components/common/map-style/` themes the map with no API key and no hosted style. `StyleSpecification` and the other spec types are re-exported from the RN package root; `@maplibre/maplibre-gl-style-spec` is already a direct dependency, so no install |
 | OpenFreeMap endpoints | source `https://tiles.openfreemap.org/planet` (TileJSON), glyphs `/fonts/{fontstack}/{range}.pbf`, sprite `/sprites/ofm_f384/ofm`. Fontstacks are **only** `Noto Sans Regular` / `Bold` / `Italic` — naming any other font yields tiles with no labels and no error. Source-layers: `water`, `waterway`, `landcover`, `landuse`, `park`, `building`, `transportation`, `transportation_name`, `place`, `water_name`, `boundary`, `aeroway`, `aerodrome_label` |
 | Style filters | A filter hoisted to a bare `const` widens to `string[]` and stops matching `FilterSpecification`'s tuple types — annotate it. Inline in a layer it infers correctly, which is what makes this confusing |
@@ -732,8 +738,11 @@ somewhere nobody asked to go. `map-focus-store.test.ts` covers it.
 **A pin shows the restroom's own first photo**, and tapping it opens a bottom
 sheet rather than navigating — the map stays behind it, which is the point.
 `/restroom/[id]` survives for deep links, notification taps and the full review
-list; both surfaces render the same components from
-`features/restrooms/components/restroom-detail.tsx`, so they cannot drift.
+list. ⚠️ **They were supposed to share `restroom-detail.tsx` so they could not
+drift — and they already have.** `/restroom/[id]` imports none of those components
+and hand-rolls its own title, rating card and amenity chips; it renders no photos at
+all. Extracting a shared `restroom-summary.tsx` is outstanding work, not a
+description of the code.
 
 Storage paths, not download URLs, are what the document stores — a URL carries a
 token and goes stale. `use-photo-url.ts` resolves them and memoises **by path,

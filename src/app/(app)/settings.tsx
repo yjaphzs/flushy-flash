@@ -44,7 +44,7 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScreenScrollView contentContainerClassName="gap-4 px-4 py-4">
+    <ScreenScrollView topInset={false} contentContainerClassName="gap-4 px-4 py-4">
       {error ? (
         <Callout tone="danger" testID="settings-error">
           <Text type="body-sm">{error}</Text>

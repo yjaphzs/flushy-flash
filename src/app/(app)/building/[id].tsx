@@ -34,7 +34,7 @@ export default function BuildingDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: building?.name ?? 'Building' }} />
-      <ScreenScrollView contentContainerClassName="px-4 py-4 gap-4">
+      <ScreenScrollView topInset={false} contentContainerClassName="px-4 py-4 gap-4">
         <View className="gap-1">
           <Text className="text-2xl font-semibold">
             {building?.name ?? (loading ? 'Loading…' : 'Unknown building')}

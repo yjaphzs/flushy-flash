@@ -54,13 +54,38 @@ export function useTabBarClearance(): number {
 /**
  * Window top to where content may safely begin.
  *
- * AGENTS.md §3 says safe area comes from `contentInsetAdjustmentBehavior`, and
- * that stays true for every SCROLLING screen. The map is the exception: it is
- * full-bleed with no scroll view, and MapLibre's ornaments are positioned in
- * absolute points, so there is nothing for the automatic behaviour to adjust.
- * Exported from here so the one screen that needs a manual inset still gets it
- * from the layouts layer rather than reaching for safe-area-context itself.
+ * ⚠️ **AGENTS.md §3 used to say safe area comes from
+ * `contentInsetAdjustmentBehavior`, and that it "stays true for every SCROLLING
+ * screen". That is only true on iOS.** The prop is declared `@platform ios` in
+ * React Native's own ScrollView (0.86.3, ScrollView.js:319-325) and Android
+ * drops it entirely — while Android also runs edge-to-edge with a transparent
+ * status bar. So every Android screen had a top inset of exactly ZERO, and the
+ * profile header sat under the status bar.
+ *
+ * The map was never the only exception; it was the only screen that had noticed.
  */
 export function useTopInset(): number {
   return useSafeAreaInsets().top;
+}
+
+/** Breathing room between the status bar and the first pixel of content. */
+export const SCREEN_TOP_GAP = 12;
+
+/**
+ * Window top to where scrolling content may safely begin — the mirror of
+ * `useTabBarClearance()`.
+ *
+ * Unlike the bottom clearance this one is **applied only on Android**, by
+ * `Screen` / `ScreenScrollView`. That asymmetry is deliberate and is not the
+ * platform split this file otherwise argues against: on iOS
+ * `contentInsetAdjustmentBehavior="automatic"` already adds this inset and
+ * works, so adding it again would double-pad every iOS screen. The honest
+ * summary is that iOS has a working mechanism and Android has none, so only
+ * Android needs a replacement.
+ *
+ * If iOS ever moves onto manual insets too, the platform check disappears and
+ * this becomes one number on both platforms, exactly like the bottom.
+ */
+export function useScreenTopClearance(): number {
+  return useTopInset() + SCREEN_TOP_GAP;
 }
