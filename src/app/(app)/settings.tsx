@@ -75,9 +75,7 @@ export default function SettingsScreen() {
             does not inherit the outer variant's typography.
           */}
           <Card.Description>
-            <UpdateRow />
-
-      {isGuest ? (
+            {isGuest ? (
               <>
                 Students with a <CampusDomain /> address get a badge, and can edit shared
                 entries.
@@ -131,6 +129,13 @@ export default function SettingsScreen() {
           </Card.Footer>
         ) : null}
       </Card>
+
+      {/*
+        A sibling Card, NOT a child of the one above. It was spliced inside that
+        card's <Card.Description> — which is a Text — so a whole Card rendered as
+        an inline run and overlapped the description it was sitting in.
+      */}
+      <UpdateRow />
 
       {isGuest ? (
         <Button onPress={() => requestWrite({ href: '/settings', reason: 'profile' })}>
