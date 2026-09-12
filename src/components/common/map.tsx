@@ -7,6 +7,7 @@ import {
   GeoJSONSource as MLGeoJSONSource,
   Layer as MLLayer,
   Callout as MLCallout,
+  LogManager as MLLogManager,
   type LngLat,
   type LngLatBounds,
   type ViewState,
@@ -14,6 +15,32 @@ import {
 } from '@maplibre/maplibre-react-native';
 
 import { CAMPUS_BOUNDS, CAMPUS_CENTER, INITIAL_ZOOM, MAX_ZOOM, MIN_ZOOM, MAP_STYLE_URL } from '@/lib/campus';
+
+/**
+ * Stop a recoverable tile fetch from opening the red error overlay.
+ *
+ * MapLibre logs `Failed to load source openmaptiles: timeout` at ERROR, which
+ * `LogManager` forwards to `console.error` — a full-screen dev error box for
+ * something the renderer retries and recovers from on its own. On a campus
+ * connection that fires often enough to train people to dismiss error boxes
+ * without reading them, which is the actual cost.
+ *
+ * ⚠️ **Downgraded to `warn`, deliberately not silenced.** If OpenFreeMap is
+ * genuinely down or rate-limiting, that is a real problem and it must still be
+ * visible in the log — just not as a crash-shaped interruption. Everything else
+ * MapLibre reports stays at its own level.
+ *
+ * The library already does exactly this for cancelled HTTP requests
+ * (`effectiveLevel` in LogManager.ts), so this follows its own precedent rather
+ * than inventing a policy.
+ */
+MLLogManager.onLog(({ level, tag, message }) => {
+  const transient = level === 'error' && /Failed to load source .*: timeout/.test(message);
+  // false falls through to the library's own console handling.
+  if (!transient) return false;
+  console.warn(`MapLibre Native [WARN] [${tag}] ${message} (transient, retrying)`);
+  return true;
+});
 
 /**
  * The single place MapLibre's API surface is named.
