@@ -13,6 +13,7 @@ import { authErrorMessage } from '@/features/auth/errors';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { useAuthStatus, useAuthStore, useIsVerifiedStudent } from '@/stores/auth-store';
 import { UpdateRow } from '@/features/updates/components/update-row';
+import { DeleteAccountRow } from '@/features/auth/components/delete-account-row';
 
 /**
  * Reachable by guests now that the app is guest-first, which this screen was
@@ -140,6 +141,9 @@ export default function SettingsScreen() {
           <Button.Label>Sign out</Button.Label>
         </Button>
       )}
+
+      {/* Below Sign out, above the footer: destructive actions go last. */}
+      {isGuest ? null : <DeleteAccountRow />}
 
       <Text className="text-center text-xs text-muted">Flushy Flash · CLSU</Text>
     </FormScreen>

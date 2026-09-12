@@ -46,9 +46,10 @@ const FALLBACK: Record<AuthContext, string> = {
   'sign-in': 'Could not sign you in. Please try again.',
   'sign-up': 'Could not create your account. Please try again.',
   reset: 'Could not send the reset email. Please try again.',
+  delete: 'Could not delete your account. Please try again.',
 };
 
-export type AuthContext = 'sign-in' | 'sign-up' | 'reset';
+export type AuthContext = 'sign-in' | 'sign-up' | 'reset' | 'delete';
 
 export function authErrorMessage(e: unknown, context: AuthContext): string {
   const mapped = MESSAGES[errorCode(e)];

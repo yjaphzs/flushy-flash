@@ -1,6 +1,7 @@
 import {
   GoogleSignin,
   isErrorWithCode,
+  isNoSavedCredentialFoundResponse,
   isSuccessResponse,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
@@ -102,4 +103,40 @@ export async function signOutGoogle() {
   } catch {
     // Best-effort: never block the Firebase sign-out this accompanies.
   }
+}
+
+/**
+ * A fresh Google ID token, for re-authenticating before a destructive action.
+ *
+ * `configure()` is called here rather than assumed, for the reason the sign-out
+ * note above gives: the module-level `configured` flag is false on any run that
+ * did not itself perform a Google sign-in, and this is reached from Settings in
+ * a session that was restored from disk.
+ *
+ * `signInSilently()` first, so the common case honours the "just yes or no"
+ * requirement with no account chooser. It fails when Google has no saved
+ * credential for this device, and only then do we show the picker.
+ */
+export async function reauthGoogleCredential(): Promise<string> {
+  if (!isGoogleSignInConfigured()) {
+    throw new Error('Google Sign-In is not configured for this build.');
+  }
+  configure();
+
+  try {
+    const silent = await GoogleSignin.signInSilently();
+    // signInSilently has its OWN response union — it can return
+    // `noSavedCredentialFound`, which isSuccessResponse's type does not model.
+    if (!isNoSavedCredentialFoundResponse(silent) && silent.data.idToken) {
+      return silent.data.idToken;
+    }
+  } catch {
+    // No saved credential — fall through to the interactive picker.
+  }
+
+  const response = await GoogleSignin.signIn();
+  if (!isSuccessResponse(response)) throw new GoogleSignInCancelled();
+  const { idToken } = response.data;
+  if (!idToken) throw new Error('Google did not return an ID token.');
+  return idToken;
 }

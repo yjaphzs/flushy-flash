@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    // node16, matching rules/tsconfig.json and for the same reason: TypeScript 6
+    // rejects `moduleResolution: node10` outright (TS5107), and node10 cannot
+    // read a package's "exports" map — which firebase-admin 13 ships.
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "types": ["node", "jest"],
+    "outDir": "lib",
+    // Explicit because the test files are excluded from the program: without
+    // it, ts-jest compiling one on its own infers a different common source
+    // directory and fails with TS5011.
+    "rootDir": "src",
+    "sourceMap": true,
+    // ts-jest requires this alongside the node16 module kind above.
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}

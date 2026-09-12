@@ -41,11 +41,19 @@ jobs:
         with:
           node-version: 24
 
-      # The Firestore emulator is a Java process.
+      # The Firestore emulator is a Java process, and firebase-tools 15 refuses
+      # to start one on anything below JDK 21:
+      #
+      #   Error: firebase-tools no longer supports Java version before 21.
+      #
+      # 21, NOT the 17 the Android builds pin. That pin is a real constraint —
+      # React Native 0.86 declares jvmToolchain(17) and its CMake tasks fail on
+      # newer JDKs — but it applies to gradle, not to this workflow, which never
+      # builds the app. The two versions are independent and must stay that way.
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       # rules/ is an isolated package: @react-native-firebase and the Firebase JS
       # SDK each pull their own @firebase/app-compat, and the duplicate copies

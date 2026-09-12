@@ -430,20 +430,34 @@ button is disabled, the rules are the boundary.
 ## 9. Verify before you claim done
 
 ```bash
-npm run typecheck                          # app
-npx tsc --noEmit -p scripts/tsconfig.json  # node scripts (separate config)
+npm run typecheck:all                      # app + scripts/ + rules/ + functions/, four tsconfigs
 npm run lint                               # includes the import firewall
 npm test
 npx expo-doctor                            # expect 21/21
 
-npm run test:rules                         # security rules — needs Java; emulator on :8181
+npm run test:rules                         # security rules — needs JDK 21+; emulator on :8181
+npm --prefix functions test                # the anon-name picker
 ```
+
+⚠️ **Two JDKs are required, for different things, and they are not
+interchangeable.** `firebase-tools` 15 refuses to start an emulator on anything
+below **JDK 21** (`Error: firebase-tools no longer supports Java version before
+21`), while React Native 0.86 declares `jvmToolchain(17)` and its CMake tasks
+fail on newer JDKs. So the rules/functions emulator needs 21+ and the Android
+build needs exactly 17 — `firebase-rules.yml` and `native-check.yml`/`release.yml`
+pin them separately on purpose. Locally, point `JAVA_HOME` at 21+ for
+`test:rules` and let `npm run prebuild` write the 17 path into
+`android/gradle.properties` for gradle.
 
 `rules/` is an **isolated npm package** with its own `node_modules`. That is not
 tidiness: `@react-native-firebase` and the Firebase JS SDK each pull in their own
 `@firebase/app-compat`, and the duplicate copies break rules-unit-testing's compat
 layer with `getApp(...).firestore is not a function`. Keeping them apart also
 stops the JS SDK ever becoming importable from app code.
+
+`functions/` is isolated for the same reason: **`firebase-admin` must never
+become importable from app code**, and a server-side dependency graph must not
+perturb the app's exact SDK 57 pins. It is where account deletion lives — see §7.
 
 For anything touching styling, also bundle it — Uniwind failures show up as
 unstyled components, not errors:

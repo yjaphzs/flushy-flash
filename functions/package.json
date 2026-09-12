@@ -1,0 +1,42 @@
+{
+  "name": "flushy-flash-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "lib/index.js",
+  "description": "Cloud Functions. Deliberately isolated from the app's dependency tree, for the same reason rules/ is: firebase-admin must never become importable from app code, and the app's exact SDK 57 pins must not be perturbed by a server-side dependency graph.",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "firebase-admin": "13.6.0",
+    "firebase-functions": "6.6.0"
+  },
+  "devDependencies": {
+    "@types/jest": "29.5.14",
+    "@types/node": "24.10.1",
+    "jest": "29.7.0",
+    "ts-jest": "29.4.12",
+    "typescript": "6.0.3"
+  },
+  "jest": {
+    "displayName": "functions",
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/src/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "<rootDir>/tsconfig.json"
+        }
+      ]
+    },
+    "testTimeout": 20000
+  }
+}

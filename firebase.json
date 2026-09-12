@@ -3,6 +3,13 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "functions": {
+    "source": "functions",
+    "codebase": "default",
+    "runtime": "nodejs22",
+    "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"],
+    "ignore": ["node_modules", ".git", "**/*.test.ts", "src/**"]
+  },
   "storage": {
     "rules": "storage.rules"
   },
@@ -15,6 +22,9 @@
     },
     "firestore": {
       "port": 8181
+    },
+    "functions": {
+      "port": 5001
     },
     "storage": {
       "port": 9199

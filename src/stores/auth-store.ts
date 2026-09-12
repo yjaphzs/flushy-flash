@@ -73,7 +73,12 @@ const GUEST = {
   hasProfile: false,
 } as const;
 
-function usesPassword(user: User) {
+/**
+ * Whether this account signs in with a password rather than a federated
+ * provider. Exported because the delete flow branches on it: a password user
+ * must re-enter their password, a Google user just confirms.
+ */
+export function usesPassword(user: User) {
   return user.providerData.some((p) => p.providerId === 'password');
 }
 

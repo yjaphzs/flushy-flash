@@ -682,3 +682,110 @@ describe('follows', () => {
     );
   });
 });
+
+/**
+ * Account deletion is a Cloud Function, and these prove WHY.
+ *
+ * `functions/src/purge-user.ts` runs with admin credentials and bypasses rules
+ * entirely. Every case here is a step of that purge attempted from a CLIENT,
+ * and every one must be denied — because a rule permissive enough to let a user
+ * do this to their own data would let them do it to someone else's, or leave an
+ * account half-deleted with no way to finish.
+ *
+ * The two positives at the end are the read paths the purge leaves behind, and
+ * they must keep working or deleted users' contributions render broken.
+ */
+describe('account deletion stays server-side', () => {
+  const ANON = 'anon_7f3k9q2x1m4p';
+
+  it('denies deleting your own profile', async () => {
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(deleteDoc(doc(db, 'users', ALICE)));
+  });
+
+  it('denies deleting your own handle', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'handles', 'alice'), {
+        uid: ALICE,
+        createdAt: serverTimestamp(),
+      });
+    });
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(deleteDoc(doc(db, 'handles', 'alice')));
+  });
+
+  // The tombstone's marker fields. hasOnly(userKeys()) rejects them with no
+  // new clause, which is exactly why the tombstone shape was chosen.
+  it('denies marking your own profile deleted', async () => {
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(updateDoc(doc(db, 'users', ALICE), { deleted: true }));
+  });
+
+  it('denies stamping deletedAt on your own profile', async () => {
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(updateDoc(doc(db, 'users', ALICE), { deletedAt: serverTimestamp() }));
+  });
+
+  it('denies re-pointing a review at an anonymous author', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'reviews', `${RESTROOM_ID}_${ALICE}`), reviewDoc());
+    });
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'reviews', `${RESTROOM_ID}_${ALICE}`), { authorId: ANON }),
+    );
+  });
+
+  // The re-key the function performs. A client doing it would be forging a
+  // review under an id that is not derived from its own uid.
+  it('denies creating a review under an anonymous composite id', async () => {
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(
+      setDoc(doc(db, 'reviews', `${RESTROOM_ID}_${ANON}`), reviewDoc({ authorId: ANON })),
+    );
+  });
+
+  it('denies re-pointing a restroom at an anonymous creator', async () => {
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(updateDoc(doc(db, 'restrooms', RESTROOM_ID), { createdBy: ANON }));
+  });
+
+  // isSelf() can never match an anon_ id, so a tombstone is unwritable by
+  // construction rather than by a rule someone could relax.
+  it('denies a signed-in user writing to a tombstone', async () => {
+    const db = testEnv.authenticatedContext(ALICE, outsider).firestore();
+    await assertFails(setDoc(doc(db, 'users', ANON), profileDoc({ handle: null })));
+  });
+
+  it('denies a signed-out user writing to a tombstone', async () => {
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(setDoc(doc(db, 'users', ANON), profileDoc({ handle: null })));
+  });
+
+  // Positive: review cards join authorId -> users/{authorId}. If a tombstone
+  // were not publicly readable, every deleted author would render as an error.
+  it('allows anyone to read a tombstone', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', ANON), {
+        ...profileDoc({ handle: null, displayName: 'Washed Away' }),
+        deleted: true,
+        deletedAt: serverTimestamp(),
+      });
+    });
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertSucceeds(getDoc(doc(db, 'users', ANON)));
+  });
+
+  // Positive: the purge FREES the handle rather than tombstoning it, so it has
+  // to be genuinely claimable afterwards. `handles` has allow update: if false,
+  // so this only works because the document is really gone.
+  it('allows a different account to claim a freed handle', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), 'handles', 'alice'));
+    });
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'handles', 'alice'), { uid: BOB, createdAt: serverTimestamp() }),
+    );
+  });
+});
