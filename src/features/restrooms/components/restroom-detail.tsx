@@ -39,7 +39,6 @@ const AMENITIES: { key: keyof Omit<Amenities, 'genderedAs'>; label: string; icon
   { key: 'hasTissue', label: 'Tissue', icon: 'scroll-text' },
   { key: 'hasBidet', label: 'Bidet', icon: 'shower-head' },
   { key: 'accessible', label: 'Accessible', icon: 'accessibility' },
-  { key: 'babyChanging', label: 'Baby changing', icon: 'baby' },
 ];
 
 export function StatusChip({ status }: { status: RestroomStatus }) {

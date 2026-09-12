@@ -30,7 +30,6 @@ function restroom(
       hasTissue: null,
       hasBidet: null,
       accessible: null,
-      babyChanging: null,
       genderedAs: null,
     },
     status,

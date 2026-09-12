@@ -1,6 +1,5 @@
 import Accessibility from 'lucide-react-native/icons/accessibility';
 import AtSign from 'lucide-react-native/icons/at-sign';
-import Baby from 'lucide-react-native/icons/baby';
 import BadgeCheck from 'lucide-react-native/icons/badge-check';
 import Bell from 'lucide-react-native/icons/bell';
 import Check from 'lucide-react-native/icons/check';
@@ -69,7 +68,6 @@ export type IconName =
   | 'scroll-text'
   | 'shower-head'
   | 'accessibility'
-  | 'baby'
   | 'clock'
   | 'image';
 
@@ -107,7 +105,6 @@ const GLYPHS: Record<IconName, Glyph> = {
   'scroll-text': ScrollText,
   'shower-head': ShowerHead,
   accessibility: Accessibility,
-  baby: Baby,
   clock: Clock,
   image: ImageIcon,
 };

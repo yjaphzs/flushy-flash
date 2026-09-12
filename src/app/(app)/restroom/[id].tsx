@@ -29,7 +29,6 @@ const AMENITY_LABELS: Record<keyof Omit<Amenities, 'genderedAs'>, string> = {
   hasTissue: 'Has tissue',
   hasBidet: 'Has bidet',
   accessible: 'Accessible',
-  babyChanging: 'Baby changing',
 };
 
 export default function RestroomDetailScreen() {

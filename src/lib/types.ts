@@ -27,7 +27,6 @@ export type Amenities = {
   hasTissue: boolean | null;
   hasBidet: boolean | null;
   accessible: boolean | null;
-  babyChanging: boolean | null;
   genderedAs: GenderedAs | null;
 };
 

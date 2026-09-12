@@ -63,7 +63,6 @@ export const EMPTY_AMENITIES: Amenities = {
   hasTissue: null,
   hasBidet: null,
   accessible: null,
-  babyChanging: null,
   genderedAs: null,
 };
 

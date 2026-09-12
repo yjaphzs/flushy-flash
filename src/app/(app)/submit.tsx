@@ -32,7 +32,6 @@ const TOGGLES: { key: keyof Omit<Amenities, 'genderedAs'>; label: string }[] = [
   { key: 'hasTissue', label: 'Has tissue' },
   { key: 'hasBidet', label: 'Has bidet' },
   { key: 'accessible', label: 'Accessible' },
-  { key: 'babyChanging', label: 'Baby changing' },
 ];
 
 /** Who may use it. Was in the type from the start and never had a control. */

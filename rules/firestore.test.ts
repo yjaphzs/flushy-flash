@@ -69,7 +69,6 @@ function restroomDoc(overrides: Record<string, unknown> = {}) {
       hasTissue: null,
       hasBidet: null,
       accessible: null,
-      babyChanging: null,
       genderedAs: null,
     },
     status: 'ok',
