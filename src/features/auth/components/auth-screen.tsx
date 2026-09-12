@@ -1,8 +1,7 @@
 import { BrandMark, Wordmark } from '@/components/common/brand-mark';
 import { GlassSurface } from '@/components/common/glass-surface';
 import { BrandGradient } from '@/components/common/gradient';
-import { Icon } from '@/components/ui/icon';
-import { Pressable } from '@/components/ui/pressable';
+import { BackButton } from '@/components/layouts/back-button';
 import { ScreenScrollView } from '@/components/layouts/screen';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
@@ -47,20 +46,16 @@ export function AuthScreen({ title, subtitle, onBack, children, testID }: AuthSc
       testID={testID}
     >
       {onBack ? (
-        // pt-3 alone put this 12px from the top of the WINDOW on Android — the
-        // (auth) group is a root-level modal, so it is full-screen there, and
-        // the chevron ended up half under the status bar and barely tappable.
-        // ScreenScrollView now supplies the inset, so this is spacing below it.
-        <View className="px-4 pt-3">
-          <Pressable
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            hitSlop={12}
-            className="h-11 w-11 items-center justify-center"
-          >
-            <Icon name="chevron-left" size={24} color="on-brand" />
-          </Pressable>
+        // `pt-3` is spacing BELOW the safe-area inset that ScreenScrollView now
+        // supplies — it used to be the only top offset, which put the chevron
+        // 12px from the top of the window on Android (this group is a
+        // full-screen modal there) and half under the status bar.
+        //
+        // `px-5` rather than the content's `px-6`: BackButton carries a -ml-3 to
+        // align the glyph with the content edge, and the gradient header below
+        // is centred, so there is nothing to line up with but the glass sheet.
+        <View className="px-5 pt-3">
+          <BackButton onPress={onBack} color="on-brand" />
         </View>
       ) : null}
 

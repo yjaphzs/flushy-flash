@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
-import { ScreenScrollView } from '@/components/layouts/screen';
+import { FormScreen } from '@/components/layouts/form-screen';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { likeRestroom, unlikeRestroom } from '@/features/likes/api';
 import { Icon } from '@/components/ui/icon';
@@ -64,10 +64,18 @@ export default function RestroomDetailScreen() {
   // Distinguish "still loading" from "genuinely gone". The store starts empty,
   // so without this every deep link flashed "no longer listed" first.
   if (!restroom) {
+    // Still needs the chevron: with headers off this is otherwise a dead end,
+    // and it is reachable by deep link where there is no gesture to fall back on.
     return (
-      <ScreenScrollView topInset={false} contentContainerClassName="flex-1 items-center justify-center gap-3 px-8">
-        {loading ? <Spinner /> : <Text>This restroom is no longer listed.</Text>}
-      </ScreenScrollView>
+      <FormScreen
+        title={loading ? 'Loading…' : 'Not found'}
+        onBack={() => router.back()}
+        contentContainerClassName="gap-6 px-5 pb-10"
+      >
+        <View className="items-center gap-3 py-8">
+          {loading ? <Spinner /> : <Text>This restroom is no longer listed.</Text>}
+        </View>
+      </FormScreen>
     );
   }
 
@@ -78,16 +86,12 @@ export default function RestroomDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: building?.name ?? 'Restroom' }} />
-      <ScreenScrollView topInset={false} contentContainerClassName="px-4 py-4 gap-4">
-        <View className="gap-1">
-          <Text className="text-2xl font-semibold">
-            {restroom.locationNote || `Floor ${restroom.floor}`}
-          </Text>
-          <Text className="text-muted">
-            {building?.name} · Floor {restroom.floor}
-          </Text>
-        </View>
-
+      <FormScreen
+        title={restroom.locationNote || `Floor ${restroom.floor}`}
+        subtitle={building ? `${building.name} · Floor ${restroom.floor}` : `Floor ${restroom.floor}`}
+        onBack={() => router.back()}
+        contentContainerClassName="gap-4 px-5 pb-10"
+      >
         <Card>
           <Card.Body>
             <Card.Title>Rating</Card.Title>
@@ -124,7 +128,7 @@ export default function RestroomDetailScreen() {
           </Button>
           <LikeButton restroomId={restroom.id} uid={uid} canWrite={canWrite} />
         </View>
-      </ScreenScrollView>
+      </FormScreen>
     </>
   );
 }

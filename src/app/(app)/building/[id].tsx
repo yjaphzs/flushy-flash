@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Card } from '@/components/ui/card';
 import { Chip } from '@/components/ui/chip';
 import { Pressable } from '@/components/ui/pressable';
-import { ScreenScrollView } from '@/components/layouts/screen';
+import { FormScreen } from '@/components/layouts/form-screen';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
@@ -34,14 +34,16 @@ export default function BuildingDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: building?.name ?? 'Building' }} />
-      <ScreenScrollView topInset={false} contentContainerClassName="px-4 py-4 gap-4">
-        <View className="gap-1">
-          <Text className="text-2xl font-semibold">
-            {building?.name ?? (loading ? 'Loading…' : 'Unknown building')}
-          </Text>
-          {building?.code ? <Text className="text-muted">{building.code}</Text> : null}
-        </View>
-
+      {/*
+        The heading is FormScreen's now, not an inline Text — the two used to be
+        a native header title and a hand-rolled h1 saying the same thing twice.
+      */}
+      <FormScreen
+        title={building?.name ?? (loading ? 'Loading…' : 'Unknown building')}
+        subtitle={building?.code}
+        onBack={() => router.back()}
+        contentContainerClassName="gap-4 px-5 pb-10"
+      >
         {loading && byFloor.length === 0 ? (
           <View className="items-center py-8">
             <Spinner />
@@ -107,7 +109,7 @@ export default function BuildingDetailScreen() {
             <Button.Label>Add another restroom</Button.Label>
           </Button>
         ) : null}
-      </ScreenScrollView>
+      </FormScreen>
     </>
   );
 }

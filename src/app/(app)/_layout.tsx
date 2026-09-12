@@ -19,10 +19,23 @@ export default function AppLayout() {
   useMyLikes();
 
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="building/[id]" options={{ title: '', headerBackButtonDisplayMode: 'minimal' }} />
-      <Stack.Screen name="restroom/[id]" options={{ title: '', headerBackButtonDisplayMode: 'minimal' }} />
+    /*
+      Headers OFF for the whole group, matching `(auth)`.
+
+      This used to be a bare <Stack>, which meant `headerShown` defaulted to
+      TRUE and every pushed screen got a platform header carrying a duplicate of
+      the heading it already rendered. Screens draw their own chevron and H1
+      through @/components/layouts/form-screen instead, which can be tinted,
+      aligned to the content edge and given a real 44pt touch target.
+
+      Each `title` below is deliberately KEPT. It no longer draws anything, but
+      it still feeds the route title and the accessibility tree, and Android
+      hardware back is unaffected either way.
+    */
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="building/[id]" options={{ title: 'Building' }} />
+      <Stack.Screen name="restroom/[id]" options={{ title: 'Restroom' }} />
       {/* Screen-level modals use native presentations, not a JS bottom sheet. */}
       <Stack.Screen
         name="submit"
@@ -37,7 +50,7 @@ export default function AppLayout() {
           sheetGrabberVisible: true,
         }}
       />
-      <Stack.Screen name="settings" options={{ title: 'Settings', headerLargeTitle: true }} />
+      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
     </Stack>
   );
 }

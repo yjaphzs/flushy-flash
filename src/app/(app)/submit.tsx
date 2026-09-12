@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
 import { PinPicker } from '@/components/common/pin-picker';
 import { PhotoPicker } from '@/features/restrooms/components/photo-picker';
-import { ScreenScrollView } from '@/components/layouts/screen';
+import { FormScreen } from '@/components/layouts/form-screen';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import {
@@ -95,7 +95,12 @@ export default function SubmitRestroomScreen() {
   const ready = Boolean(point) && landmark.trim().length > 0 && !form.busy;
 
   return (
-    <ScreenScrollView topInset={false} contentContainerClassName="px-5 py-5 gap-6">
+    <FormScreen
+      title="Add a restroom"
+      subtitle="Drop a pin where it is, then tell people how to find it."
+      onBack={() => router.back()}
+      avoidsKeyboard
+    >
       <View className="gap-2">
         <Text type="h4">Where is it?</Text>
         <PinPicker onChange={setPoint} />
@@ -203,6 +208,6 @@ export default function SubmitRestroomScreen() {
       <Button size="lg" className="rounded-full" onPress={onSubmit} isDisabled={!ready || !canWrite}>
         <Button.Label>{form.progress ?? 'Save restroom'}</Button.Label>
       </Button>
-    </ScreenScrollView>
+    </FormScreen>
   );
 }

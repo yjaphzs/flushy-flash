@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { router } from 'expo-router';
 
 import { CampusDomain, EmailAddress } from '@/components/common/email-text';
 import { Callout } from '@/components/feedback/callout';
-import { ScreenScrollView } from '@/components/layouts/screen';
+import { FormScreen } from '@/components/layouts/form-screen';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
@@ -44,7 +45,12 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScreenScrollView topInset={false} contentContainerClassName="gap-4 px-4 py-4">
+    <FormScreen
+      title="Settings"
+      subtitle="Your account and this device."
+      onBack={() => router.back()}
+      contentContainerClassName="gap-4 px-5 pb-10"
+    >
       {error ? (
         <Callout tone="danger" testID="settings-error">
           <Text type="body-sm">{error}</Text>
@@ -133,6 +139,6 @@ export default function SettingsScreen() {
       )}
 
       <Text className="text-center text-xs text-muted">Flushy Flash · CLSU</Text>
-    </ScreenScrollView>
+    </FormScreen>
   );
 }
