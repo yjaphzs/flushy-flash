@@ -1,6 +1,7 @@
 import { useCSSVariable } from 'uniwind';
 
 import type { PinShape } from '@/components/common/pin-zoom';
+import type { PinRating } from '@/features/restrooms/rating';
 import { Icon } from '@/components/ui/icon';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -43,6 +44,8 @@ export type PinBodyProps = {
   photoUrl: string | null;
   /** Caption for the card shape — the landmark, or the building name. */
   label: string;
+  /** Aggregate rating for the card shape, or null when nothing is reviewed yet. */
+  rating: PinRating | null;
   /** Whether this pin's sheet is currently open. */
   selected: boolean;
   /** Fires when the photo is genuinely on screen; drives the bitmap re-capture. */
@@ -70,7 +73,7 @@ export type PinBodyProps = {
  * all. The ring does that job: it is what separates a night-time entrance shot
  * from the dark map underneath.
  */
-export function PinBody({ shape, photoUrl, label, selected, onPhotoDisplay }: PinBodyProps) {
+export function PinBody({ shape, photoUrl, label, rating, selected, onPhotoDisplay }: PinBodyProps) {
   const resolved = useCSSVariable('--color-accent');
   /**
    * A fourth sRGB copy of --accent, and it is registered in AGENTS.md §14's
@@ -121,12 +124,33 @@ export function PinBody({ shape, photoUrl, label, selected, onPhotoDisplay }: Pi
                 taller than its neighbours for no gain.
               */}
               <View
-                className="justify-center px-2"
+                className="flex-row items-center gap-1 px-2"
                 style={{ height: CARD.caption, width: contentW }}
               >
-                <Text type="body-xs" weight="medium" numberOfLines={1}>
+                <Text type="body-xs" weight="medium" numberOfLines={1} className="flex-1">
                   {label}
                 </Text>
+                {/*
+                  ⚠️ Rides the EXISTING caption row rather than adding a line.
+                  `pin-zoom.ts` derives MAX_PINS from ~574 KB per card bitmap at
+                  this 140x114 geometry, so a second line would silently
+                  invalidate that arithmetic along with the memory budget.
+
+                  A numeral, not `stars.tsx`: five 14pt glyphs plus a label
+                  cannot fit beside a landmark in 132pt, and a numeral also
+                  satisfies §3's rule that a fill never carries meaning alone.
+                */}
+                {rating ? (
+                  <View className="flex-row items-center gap-0.5">
+                    <Icon name="star" size={10} color="accent" filled />
+                    <Text type="body-xs" weight="medium">
+                      {rating.average.toFixed(1)}
+                    </Text>
+                    <Text type="body-xs" color="muted">
+                      ·{rating.count}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
           </View>

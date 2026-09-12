@@ -3,6 +3,7 @@ import { useCallback, useRef } from 'react';
 import { MapViewAnnotation, type MapViewAnnotationRef, toLngLat } from '@/components/common/map';
 import type { PinShape } from '@/components/common/pin-zoom';
 import { PinBody } from '@/components/common/restroom-pin-body';
+import { pinRatingKey, type PinRating } from '@/features/restrooms/rating';
 import { View } from '@/components/ui/view';
 
 export type RestroomPinProps = {
@@ -13,6 +14,8 @@ export type RestroomPinProps = {
   photoUrl: string | null;
   /** Caption for the card shape — the landmark, or the building name. */
   label: string;
+  /** Aggregate rating for the card shape, or null when nothing is reviewed yet. */
+  rating: PinRating | null;
   shape: PinShape;
   selected: boolean;
   onPress: () => void;
@@ -63,6 +66,7 @@ export function RestroomPin({
   lng,
   photoUrl,
   label,
+  rating,
   shape,
   selected,
   onPress,
@@ -89,9 +93,17 @@ export function RestroomPin({
       Re-keying on the photo remounts the annotation, so the child view gets a
       NEW React tag, hence a new bitmapId, hence a genuinely changed
       `iconImage`. Costs one remount per pin the first time its photo resolves.
+
+      The RATING is in the key for exactly the same reason and not a different
+      one. It arrives on a live snapshot after the Cloud Function recomputes it,
+      which is a pure CONTENT change — the card is the same size, so nothing
+      about the symbol's properties differs and the stale bitmap would stay on
+      screen indefinitely. `pinRatingKey` rounds to the one decimal the caption
+      prints, so an average drifting by 0.004 does not cost every visible pin a
+      remount.
     */
     <MapViewAnnotation
-      key={photoUrl ?? 'glyph'}
+      key={`${photoUrl ?? 'glyph'}|${pinRatingKey(rating)}`}
       ref={annotation}
       id={id}
       lngLat={toLngLat({ lat, lng })}
@@ -108,6 +120,7 @@ export function RestroomPin({
           shape={shape}
           photoUrl={photoUrl}
           label={label}
+          rating={rating}
           selected={selected}
           onPhotoDisplay={refresh}
         />

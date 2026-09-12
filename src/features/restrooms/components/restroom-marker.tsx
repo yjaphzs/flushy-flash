@@ -1,6 +1,7 @@
 import type { PinShape } from '@/components/common/pin-zoom';
 import { RestroomPin } from '@/components/common/restroom-pin';
 import { usePhotoUrl } from '@/features/restrooms/use-photo-url';
+import { pinRating } from '@/features/restrooms/rating';
 import type { Building, Restroom } from '@/lib/types';
 
 export type RestroomMarkerProps = {
@@ -39,6 +40,14 @@ export function RestroomMarker({
   const label =
     restroom.landmark || buildings.find((b) => b.id === restroom.buildingId)?.name || 'Restroom';
 
+  /*
+    Read straight off the document, which campus-store already holds — zero
+    extra reads and available at FIRST paint. That matters more than it looks:
+    a rating fetched per pin would arrive after the bitmap was baked, and
+    Android does not repaint a ViewAnnotation on a content change.
+  */
+  const rating = pinRating(restroom);
+
   return (
     <RestroomPin
       id={restroom.id}
@@ -46,6 +55,7 @@ export function RestroomMarker({
       lng={restroom.location.longitude}
       photoUrl={photo}
       label={label}
+      rating={rating}
       shape={shape}
       selected={selected}
       onPress={onPress}

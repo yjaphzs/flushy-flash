@@ -9,11 +9,21 @@ const TRACK = 10;
 const KNOB = 20;
 
 /**
- * Average cleanliness, as a value on a dirty→clean track.
+ * Average OVERALL rating, as a value on a poor→great track.
  *
- * The rating is computed server-side per open (`getAggregateFromServer`) rather
- * than denormalised onto the document, which is what keeps `ratingSum` /
- * `ratingCount` non-client-writable — a user cannot inflate their favourite.
+ * ⚠️ **This used to be docblocked as cleanliness, with a Dirty/Acceptable/Clean
+ * axis, and the label was simply wrong.** `fetchRatingSummary` averages
+ * `rating`, never `cleanliness` — so the component has always shown the overall
+ * score under a cleanliness heading, contradicting its own "AVERAGE SCORE …
+ * out of 5" title two lines below. The data was right and the words were not.
+ *
+ * It still reads `getAggregateFromServer` per open rather than the document's
+ * `ratingSum` / `ratingCount`. That is now a round trip it could skip — the
+ * `onReviewWritten` Function maintains those fields, and the map pin reads them
+ * straight from `campus-store`. Left alone deliberately: the aggregate query is
+ * authoritative for a restroom whose reviews predate the trigger, where the
+ * document still says 0. Switching over is safe only once every restroom has
+ * been recomputed at least once.
  *
  * Renders nothing at all until there is at least one review. A 0.0 on an empty
  * scale reads as "this restroom scored zero" rather than "nobody has said", and
@@ -58,7 +68,7 @@ export function ScoreBar({ restroomId }: { restroomId: string }) {
         {/*
           Gradient fills its parent (absolute inset-0) and takes no style, so the
           track's shape lives on this wrapper and the clip comes from
-          overflow-hidden. The colours are the dirty→clean ramp and are NOT brand
+          overflow-hidden. The colours are the poor→great ramp and are NOT brand
           tokens: red and amber have no equivalent in the palette, and the green
           end is the accent's hex so the scale lands on the brand rather than
           near it.
@@ -93,13 +103,13 @@ export function ScoreBar({ restroomId }: { restroomId: string }) {
 
       <View className="flex-row justify-between">
         <Text type="body-xs" color="muted">
-          Dirty
+          Poor
         </Text>
         <Text type="body-xs" color="muted">
-          Acceptable
+          OK
         </Text>
         <Text type="body-xs" color="muted">
-          Clean
+          Great
         </Text>
       </View>
     </View>

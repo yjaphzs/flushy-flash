@@ -810,6 +810,33 @@ Stubbed — safe places to pick up: the review composer
 (`src/app/(app)/review/[restroomId].tsx`) and notifications
 (`src/app/(app)/(tabs)/notifications.tsx`, blocked on Cloud Functions — see §7).
 
+**The map pin carries `★ 4.2 ·12`, maintained by a Cloud Function.**
+`functions/src/rating-aggregate.ts` recomputes `restrooms.ratingSum` /
+`ratingCount` on every `reviews/{reviewId}` write. Three things about it:
+
+- **It RECOMPUTES rather than applying a delta**, which costs one query per
+  review write and buys correctness that a delta cannot. Functions deliver at
+  least once, so a retried delta double-counts permanently and silently; a
+  dropped one under-counts forever. Recomputation heals on the next write.
+- **The rating is in the annotation's `key`.** Android bakes a ViewAnnotation's
+  children into a bitmap and does NOT repaint on a content change (§4), so a
+  rating arriving on a live snapshot would otherwise never appear.
+  `pinRatingKey` rounds to the decimal the caption prints, so a 0.004 drift
+  does not remount every visible pin.
+- **It rides the EXISTING 26pt caption row**, because `pin-zoom.ts` derives
+  `MAX_PINS` from ~574 KB per card bitmap at the current 140×114 geometry.
+  Growing the card invalidates that arithmetic.
+
+⚠️ **A restroom reviewed BEFORE the trigger deployed still reads 0** until
+someone writes a review on it — the trigger only fires on a review write. That
+is why `pinRating()` returns null at `ratingCount === 0` rather than an average
+of zero, and why `score-bar.tsx` still pays for `getAggregateFromServer`
+instead of reading the document.
+
+`score-bar.tsx` was also docblocked as **cleanliness** with a Dirty/Acceptable/
+Clean axis while calling `fetchRatingSummary`, which averages `rating`. The
+data was right and the words were wrong; the axis now reads Poor/OK/Great.
+
 **Profile is a curved brand band with the avatar straddling its lower edge**,
 decomposed into `src/features/profile/components/`. Three things about it are
 decisions rather than styling, and each has a measurement behind it:
