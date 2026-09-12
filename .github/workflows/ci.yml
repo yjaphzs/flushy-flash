@@ -96,6 +96,22 @@ jobs:
 
       # Includes the no-restricted-imports firewall that keeps app code off
       # react-native / heroui-native / MapLibre directly.
+      # functions/ is an isolated package with its own node_modules, like rules/ —
+      # firebase-admin must never become importable from app code. That isolation
+      # is also why the app typecheck EXCLUDES it: with functions/ in the app's
+      # tsconfig `include`, tsc compiled firebase-functions imports that only
+      # resolve after a separate npm ci, so CI failed with TS2307 while local
+      # runs passed purely because the directory happened to be installed.
+      - name: Install functions deps
+        if: steps.filter.outputs.code == 'true'
+        working-directory: functions
+        run: npm ci
+
+      - name: Typecheck and test functions
+        if: steps.filter.outputs.code == 'true'
+        working-directory: functions
+        run: npm run typecheck && npm test
+
       - name: Lint
         if: steps.filter.outputs.code == 'true'
         run: npm run lint

@@ -29,6 +29,7 @@
     "ios",
     "dist",
     "scripts",
-    "rules"
+    "rules",
+    "functions"
   ]
 }
