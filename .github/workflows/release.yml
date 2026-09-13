@@ -117,6 +117,86 @@ jobs:
           fi
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "${{ runner.temp }}/release.keystore"
 
+      # ⚠️ Gradle does NOT check the keystore until it is already 20 minutes into
+      # the build, and when it fails it does not say why.
+      #
+      # `:app:validateSigningRelease` sounds like it validates the signing config.
+      # It only checks that the store FILE EXISTS. A wrong password, a missing
+      # alias, or a base64 secret that decoded to something truncated all sail
+      # straight past it and then fail inside `:app:packageRelease` as
+      #
+      #     A failure occurred while executing
+      #     PackageAndroidArtifact$IncrementalSplitterRunnable
+      #
+      # with the real cause buried in a `Caused by:` line that interleaves with
+      # gradle's deprecation warnings and is easy to lose entirely.
+      #
+      # v1.1.0 failed exactly that way. Reproducing `assembleRelease` locally with
+      # the same ABI flag and the same `useLegacyPackaging` produced a working
+      # 49 MB APK, which is what narrowed it to signing — an inference that cost
+      # a full local build and should not have been necessary.
+      #
+      # So: open the keystore here, the same way gradle will, and name the problem
+      # in seconds. Every check below is non-destructive and prints no secret.
+      - name: Verify the keystore before building
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          KS="${{ runner.temp }}/release.keystore"
+
+          for name in ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set. All four signing secrets are required."
+              exit 1
+            fi
+          done
+
+          BYTES=$(stat -c%s "$KS")
+          echo "keystore: $BYTES bytes"
+          # A real keystore is a few kB. Anything tiny means the base64 secret was
+          # empty, truncated, or pasted with the wrapping mangled.
+          if [ "$BYTES" -lt 100 ]; then
+            echo "::error::Decoded keystore is only $BYTES bytes — ANDROID_KEYSTORE_BASE64 is empty or truncated."
+            exit 1
+          fi
+
+          # 1. Does the STORE password open it at all?
+          if ! keytool -list -keystore "$KS" -storepass "$ANDROID_KEYSTORE_PASSWORD" >/dev/null 2>err.txt; then
+            echo "::error::Cannot open the keystore — ANDROID_KEYSTORE_PASSWORD is wrong, or the decoded file is not a keystore."
+            sed 's/^/  /' err.txt
+            exit 1
+          fi
+
+          # 2. Is the alias actually in there? A renamed or mistyped alias is the
+          #    single easiest of the four secrets to get wrong.
+          if ! keytool -list -keystore "$KS" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null 2>err.txt; then
+            echo "::error::Alias '$ANDROID_KEY_ALIAS' is not in the keystore. Entries present:"
+            keytool -list -keystore "$KS" -storepass "$ANDROID_KEYSTORE_PASSWORD" \
+              | grep -E 'PrivateKeyEntry|trustedCertEntry' | sed 's/^/  /' || true
+            exit 1
+          fi
+
+          # 3. Does the KEY password work? Neither check above touches it, and it
+          #    is the one gradle fails on last. -certreq needs it and changes
+          #    nothing; the CSR goes to /dev/null.
+          #
+          #    Verified against a JKS store with a deliberately wrong key password:
+          #    caught, exit 1. On a PKCS12 store this is a no-op, because PKCS12
+          #    has no separate key password — keytool silently uses the store
+          #    password. That is correct rather than a gap: if the format cannot
+          #    hold a distinct key password, gradle cannot fail on one either.
+          if ! keytool -certreq -alias "$ANDROID_KEY_ALIAS" -keystore "$KS" \
+               -storepass "$ANDROID_KEYSTORE_PASSWORD" -keypass "$ANDROID_KEY_PASSWORD" \
+               >/dev/null 2>err.txt; then
+            echo "::error::ANDROID_KEY_PASSWORD is wrong for alias '$ANDROID_KEY_ALIAS'."
+            sed 's/^/  /' err.txt
+            exit 1
+          fi
+
+          echo "keystore opens, alias '$ANDROID_KEY_ALIAS' found, both passwords accepted"
+
       - name: Assemble release APK
         working-directory: android
         env:
