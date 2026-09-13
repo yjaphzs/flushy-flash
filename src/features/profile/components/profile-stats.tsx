@@ -1,5 +1,8 @@
+import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
+import { router } from 'expo-router';
+
 import { useLikedIds } from '@/stores/likes-store';
 import { useRestrooms } from '@/stores/campus-store';
 
@@ -32,22 +35,39 @@ export function ProfileStats({ uid }: ProfileStatsProps) {
       className="flex-row items-center rounded-3xl border border-border bg-surface px-2 py-4"
       style={{ borderCurve: 'continuous' }}
     >
-      <Stat value={saved} label="Saved" />
+      {/*
+        Both tiles navigate, not just one. A strip where half the numbers are
+        tappable and half are not teaches people that numbers here do nothing.
+      */}
+      <Stat value={saved} label="Saved" onPress={() => router.push('/likes')} />
       <View className="h-8 w-px bg-border" />
-      <Stat value={added} label="Added" />
+      <Stat value={added} label="Added" onPress={() => router.push('/my-restrooms')} />
     </View>
   );
 }
 
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({
+  value,
+  label,
+  onPress,
+}: {
+  value: number;
+  label: string;
+  onPress: () => void;
+}) {
   return (
-    <View className="flex-1 items-center gap-0.5">
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${value} ${label}`}
+      className="flex-1 items-center gap-0.5 py-1"
+    >
       <Text type="h3" weight="bold">
         {value}
       </Text>
       <Text type="body-xs" color="muted">
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 }

@@ -80,6 +80,7 @@ export default function AppLayout() {
           options={{ presentation: 'fullScreenModal', title: 'Where is it?' }}
         />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="my-restrooms" options={{ title: 'Your restrooms' }} />
       </Stack>
       <UpdateDialog />
     </>

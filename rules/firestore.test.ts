@@ -37,6 +37,10 @@ const BOB = 'bob-uid';
 const clsuStudent = { email: 'alice@clsu.edu.ph', email_verified: true };
 /** Verified, but not a CLSU address — must NOT earn the badge. */
 const outsider = { email: 'bob@gmail.com', email_verified: true };
+/** The SECOND campus domain. Must earn the badge exactly like the first. */
+const clsu2Student = { email: 'dave@clsu2.edu.ph', email_verified: true };
+/** Near miss. Anchored regex, so this must NOT earn the badge. */
+const nearMissStudent = { email: 'eve@clsu3.edu.ph', email_verified: true };
 /** CLSU address that has not been confirmed — must NOT earn the badge either. */
 const unverifiedStudent = { email: 'carol@clsu.edu.ph', email_verified: false };
 
@@ -600,6 +604,63 @@ describe('restrooms', () => {
  * else's contribution survives, and who cast it must not be public on a campus
  * where a handle identifies a person.
  */
+/**
+ * The campus domain, which is TWO domains now.
+ *
+ * ⚠️ `isVerifiedStudent()` is the equality target of three rules, so a drift
+ * between this regex and `CLSU_EMAIL_DOMAINS` in src/lib/campus.ts is not a
+ * wrong badge — it is a permission-denied on profile creation. There is no
+ * import across that boundary; these cases are what holds the two together.
+ * `src/lib/campus.test.ts` asserts the same list client-side.
+ */
+describe('campus email domains', () => {
+  const badge = (uid: string, token: Record<string, unknown>) =>
+    setDoc(doc(testEnv.authenticatedContext(uid, token).firestore(), 'users', uid), {
+      ...profileDoc({ handle: uid.replace(/[^a-z0-9_]/g, ''), verifiedStudent: true }),
+    });
+
+  it('grants the badge on the primary domain', async () => {
+    await assertSucceeds(badge('alice2', clsuStudent));
+  });
+
+  it('grants the badge on the second domain', async () => {
+    await assertSucceeds(badge('dave', clsu2Student));
+  });
+
+  it('refuses a near miss like clsu3.edu.ph', async () => {
+    await assertFails(badge('eve', nearMissStudent));
+  });
+
+  it('refuses an unconfirmed address on either domain', async () => {
+    await assertFails(badge('carol', unverifiedStudent));
+    await assertFails(
+      badge('frank', { email: 'frank@clsu2.edu.ph', email_verified: false }),
+    );
+  });
+
+  it('refuses a lookalike domain that merely ends the same way', async () => {
+    await assertFails(badge('mallory', { email: 'm@notclsu.edu.ph', email_verified: true }));
+    await assertFails(
+      badge('trudy', { email: 'clsu.edu.ph@evil.com', email_verified: true }),
+    );
+  });
+
+  it('lets a second-domain student vote with student weight', async () => {
+    const db = testEnv.authenticatedContext('dave', clsu2Student).firestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', 'dave'), {
+        ...profileDoc({ handle: 'dave', displayName: 'Dave', verifiedStudent: true }),
+        createdAt: new Date(),
+      });
+    });
+    await assertSucceeds(
+      setDoc(doc(db, 'restroomVotes', voteId(RESTROOM_ID, 'dave')), 
+        voteDoc({ voterId: 'dave', byStudent: true }),
+      ),
+    );
+  });
+});
+
 describe('restroom votes', () => {
   const bobVote = voteId(RESTROOM_ID, BOB);
 

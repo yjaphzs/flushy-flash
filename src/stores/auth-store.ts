@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { User } from '@react-native-firebase/auth';
-import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
+import { isCampusEmail } from '@/lib/campus';
 
 /**
  * The app is guest-first: everyone gets the map, and an account is only needed
@@ -170,5 +170,5 @@ export const canWriteNow = () => useAuthStore.getState().status === 'signedIn';
  */
 export const useIsVerifiedStudent = () =>
   useAuthStore(
-    (s) => s.emailVerified && (s.email?.toLowerCase().endsWith(`@${CLSU_EMAIL_DOMAIN}`) ?? false),
+    (s) => s.emailVerified && isCampusEmail(s.email),
   );

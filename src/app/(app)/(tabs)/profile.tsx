@@ -9,7 +9,7 @@ import { signOut } from '@/features/auth/api';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { GuestProfile } from '@/features/profile/components/guest-profile';
 import { ProfileHeader } from '@/features/profile/components/profile-header';
-import { ProfileRow } from '@/features/profile/components/profile-row';
+import { ActionGroup, ActionRow } from '@/components/common/action-row';
 import { ProfileStats } from '@/features/profile/components/profile-stats';
 import { useAuthStatus, useAuthStore, useHandle, useUid } from '@/stores/auth-store';
 
@@ -74,53 +74,41 @@ export default function ProfileScreen() {
             "Delete account" — which lives in Settings, where the destructive
             actions are, behind the confirmation it needs.
           */}
-          <View
-            className="overflow-hidden rounded-3xl border border-border bg-surface"
-            style={{ borderCurve: 'continuous' }}
-          >
+          <ActionGroup>
             {/*
               Through requestWrite, not a raw push: an account that is signed in
               but still `needsVerification` lands on the right step instead of
               on a form it cannot submit. This is the second global entry to
               /submit, now that the centre tab-bar slot is "find the nearest".
             */}
-            <ProfileRow
+            <ActionRow
               icon="plus"
               label="Add a restroom"
               hint="Put one on the map for everyone"
               onPress={() => requestWrite({ href: '/submit', reason: 'add' })}
             />
-            <Divider />
-            <ProfileRow
+            <ActionRow
+              icon="map-pin"
+              label="Your restrooms"
+              hint="The ones you added, and whether they are confirmed"
+              onPress={() => router.push('/my-restrooms')}
+            />
+            <ActionRow
               icon="heart"
               label="Saved restrooms"
               hint="The ones you starred"
               onPress={() => router.push('/likes')}
             />
-            <Divider />
-            <ProfileRow
+            <ActionRow
               icon="settings"
               label="Settings"
               hint="Account, email and privacy"
               onPress={() => router.push('/settings')}
             />
-            <Divider />
-            <ProfileRow icon="log-out" label="Sign out" tone="danger" terminal onPress={signOut} />
-          </View>
+            <ActionRow icon="log-out" label="Sign out" tone="danger" terminal onPress={signOut} />
+          </ActionGroup>
         </View>
       </View>
     </ScreenScrollView>
   );
-}
-
-/**
- * Hairline between rows, inset past the icon tiles so it reads as a list.
- *
- * The inset is a style rather than `ml-[68px]`: it is derived from ProfileRow's
- * px-4 + 44pt tile + gap-3, which is arithmetic, not a spacing step — and an
- * arbitrary-value class that uniwind fails to compile produces no error, just a
- * divider that runs the full width.
- */
-function Divider() {
-  return <View className="h-px bg-border" style={{ marginLeft: 16 + 44 + 12 }} />;
 }

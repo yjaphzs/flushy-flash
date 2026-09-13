@@ -1,4 +1,4 @@
-import { pinRating, pinRatingKey } from '@/features/restrooms/rating';
+import { pinKey, pinRating, pinRatingKey } from '@/features/restrooms/rating';
 import type { Restroom } from '@/lib/types';
 
 const at = (ratingSum: number, ratingCount: number) => ({ ratingSum, ratingCount }) as Restroom;
@@ -37,5 +37,24 @@ describe('pinRatingKey', () => {
 
   it('has a distinct value for unrated', () => {
     expect(pinRatingKey(null)).toBe('unrated');
+  });
+});
+
+describe('pinKey', () => {
+  const rated = pinRating({ ratingSum: 8, ratingCount: 2 } as Restroom);
+
+  it('changes when a restroom becomes verified', () => {
+    // The case that silently fails without it: verified flips on a live
+    // snapshot at an identical card size, and Android keeps the stale bitmap.
+    expect(pinKey(null, rated, false)).not.toEqual(pinKey(null, rated, true));
+  });
+
+  it('still changes when the photo or the rating changes', () => {
+    expect(pinKey(null, rated, true)).not.toEqual(pinKey('a.webp', rated, true));
+    expect(pinKey(null, rated, true)).not.toEqual(pinKey(null, null, true));
+  });
+
+  it('is stable when nothing drawn has changed', () => {
+    expect(pinKey('a.webp', rated, true)).toEqual(pinKey('a.webp', rated, true));
   });
 });

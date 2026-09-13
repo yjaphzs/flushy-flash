@@ -11,7 +11,7 @@ import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { resetPassword } from '@/features/auth/api';
 import { authErrorMessage, isAccountNotFound, isEmailish } from '@/features/auth/errors';
-import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
+import { CLSU_PRIMARY_DOMAIN } from '@/lib/campus';
 
 /**
  * Presented as a form sheet, so no gradient here — the sheet has its own
@@ -87,7 +87,7 @@ export default function ForgotPasswordScreen() {
               value={email}
               onChangeText={setEmail}
               leading="mail"
-              placeholder={`you@${CLSU_EMAIL_DOMAIN}`}
+              placeholder={`you@${CLSU_PRIMARY_DOMAIN}`}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}

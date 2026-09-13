@@ -56,6 +56,7 @@ export function RestroomMarker({
       photoUrl={photo}
       label={label}
       rating={rating}
+      verified={restroom.verified}
       shape={shape}
       selected={selected}
       onPress={onPress}

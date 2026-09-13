@@ -3,7 +3,7 @@ import { useCallback, useRef } from 'react';
 import { MapViewAnnotation, type MapViewAnnotationRef, toLngLat } from '@/components/common/map';
 import type { PinShape } from '@/components/common/pin-zoom';
 import { PinBody } from '@/components/common/restroom-pin-body';
-import { pinRatingKey, type PinRating } from '@/features/restrooms/rating';
+import { pinKey, type PinRating } from '@/features/restrooms/rating';
 import { View } from '@/components/ui/view';
 
 export type RestroomPinProps = {
@@ -16,6 +16,8 @@ export type RestroomPinProps = {
   label: string;
   /** Aggregate rating for the card shape, or null when nothing is reviewed yet. */
   rating: PinRating | null;
+  /** Whether the community has confirmed it. Draws the badge. */
+  verified: boolean;
   shape: PinShape;
   selected: boolean;
   onPress: () => void;
@@ -67,6 +69,7 @@ export function RestroomPin({
   photoUrl,
   label,
   rating,
+  verified,
   shape,
   selected,
   onPress,
@@ -103,7 +106,7 @@ export function RestroomPin({
       remount.
     */
     <MapViewAnnotation
-      key={`${photoUrl ?? 'glyph'}|${pinRatingKey(rating)}`}
+      key={pinKey(photoUrl, rating, verified)}
       ref={annotation}
       id={id}
       lngLat={toLngLat({ lat, lng })}
@@ -121,6 +124,7 @@ export function RestroomPin({
           photoUrl={photoUrl}
           label={label}
           rating={rating}
+          verified={verified}
           selected={selected}
           onPhotoDisplay={refresh}
         />

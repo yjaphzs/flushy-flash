@@ -1,20 +1,22 @@
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { ActionRow } from '@/components/common/action-row';
 import { Text } from '@/components/ui/text';
+import { View } from '@/components/ui/view';
 import { formatBytes, installedVersion } from '@/features/updates/api';
 import { useUpdateCheck } from '@/features/updates/use-update-check';
 import { useUpdateError, useUpdateOffer, useUpdatePhase } from '@/stores/update-store';
 
 /**
- * The version card on Settings, and the only place a failed check is visible.
+ * The version row on Settings, and the only place a failed check is visible.
  *
  * Everywhere else a failed update check is silent — it is not an event, and a
  * student on patchy campus wifi should not be told about it. Here it is
- * different: someone has just tapped a button and is owed an answer, including
- * a bad one.
+ * different: someone has just tapped a row and is owed an answer, including a
+ * bad one.
  *
- * Its own component rather than more lines in `settings.tsx`, which sits close
- * to the 200-line cap.
+ * The whole row is the press target rather than a card with a button in its
+ * footer. "Check for updates" was the only thing that button did, and a row
+ * that already names the version is a better place to tap for a newer one than
+ * a second control repeating the same idea underneath it.
  */
 export function UpdateRow() {
   const { check } = useUpdateCheck();
@@ -26,25 +28,27 @@ export function UpdateRow() {
   const available = offer !== null && phase !== 'idle';
 
   return (
-    <Card>
-      <Card.Body>
-        <Card.Title>App version</Card.Title>
-        <Card.Description>
-          {available
-            ? `${installedVersion()} — version ${offer.version} is available (${formatBytes(offer.bytes)})`
-            : `${installedVersion()} — up to date`}
-        </Card.Description>
-        {error ? (
-          <Text type="body-sm" className="text-danger">
-            {error}
-          </Text>
-        ) : null}
-      </Card.Body>
-      <Card.Footer>
-        <Button variant="secondary" onPress={check} isDisabled={checking}>
-          <Button.Label>{checking ? 'Checking…' : 'Check for updates'}</Button.Label>
-        </Button>
-      </Card.Footer>
-    </Card>
+    <View className="gap-1">
+      <ActionRow
+        icon="refresh-cw"
+        label="App version"
+        hint={
+          checking
+            ? 'Checking…'
+            : available
+              ? `${installedVersion()} — version ${offer.version} is available (${formatBytes(offer.bytes)})`
+              : `${installedVersion()} — up to date`
+        }
+        // Disabling the row outright would leave no way to see it is busy, so
+        // the hint carries the state and a second press is simply ignored
+        // upstream by the store's own phase guard.
+        onPress={checking ? undefined : check}
+      />
+      {error ? (
+        <Text type="body-xs" className="px-4 pb-1 text-danger">
+          {error}
+        </Text>
+      ) : null}
+    </View>
   );
 }
