@@ -56,6 +56,21 @@ type BaseInputProps = Pick<
   leading?: IconName;
   /** Status slot: a spinner, a check, a taken/available mark. */
   trailing?: React.ReactNode;
+  /**
+   * Restyles the input's own surface.
+   *
+   * Needed because heroui paints the background in a CSS class, not a utility:
+   * `.input__input--variant-primary` sets `background-color: var(--color-field)`,
+   * and `--field-background` is only 14% alpha — so on any surface that is not
+   * the form card it reads as a grey wash over whatever is behind it. The map's
+   * search bar wants the white pill it sits in, not that.
+   *
+   * ⚠️ It is also where a caller fixes the FOCUS RING. On Android focus draws
+   * `border-accent` at `--field-radius` (12px); inside a pill-shaped parent
+   * that ring's corners do not follow the pill and get clipped. Passing a
+   * matching radius here is what keeps the two in step.
+   */
+  className?: string;
   ref?: React.Ref<TextInputHandle>;
 };
 
@@ -76,7 +91,7 @@ const inputChrome = {
   background: Platform.OS === 'ios' ? undefined : null,
 } as const;
 
-function FieldInput({ leading, trailing, ref, ...props }: BaseInputProps) {
+function FieldInput({ leading, trailing, className, ref, ...props }: BaseInputProps) {
   return (
     <InputGroup>
       {leading ? (
@@ -84,7 +99,7 @@ function FieldInput({ leading, trailing, ref, ...props }: BaseInputProps) {
           <Icon name={leading} size={18} color="field-placeholder" />
         </InputGroup.Prefix>
       ) : null}
-      <InputGroup.Input ref={ref} {...inputChrome} {...props} />
+      <InputGroup.Input ref={ref} {...inputChrome} className={className} {...props} />
       {trailing ? <InputGroup.Suffix isDecorative>{trailing}</InputGroup.Suffix> : null}
     </InputGroup>
   );
