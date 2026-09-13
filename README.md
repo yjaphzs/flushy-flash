@@ -4,90 +4,95 @@
 
 # 🚽 Flushy Flash
 
-A campus restroom finder for **Central Luzon State University**.
+Find a restroom on the CLSU campus, in a couple of taps.
 
 [![ci](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/ci.yml)
 [![firebase-rules](https://github.com/yjaphzs/flushy-flash/actions/workflows/firebase-rules.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/firebase-rules.yml)
+[![native-check](https://github.com/yjaphzs/flushy-flash/actions/workflows/native-check.yml/badge.svg)](https://github.com/yjaphzs/flushy-flash/actions/workflows/native-check.yml)
+
+[**Download the app**](https://github.com/yjaphzs/flushy-flash/releases) ·
+[What you can do](#what-you-can-do) ·
+[Using it](#using-it) ·
+[For developers](#for-developers)
 
 </div>
 
 ---
 
-> [!NOTE]
-> **Working on this with an AI agent?** Read [AGENTS.md](./AGENTS.md) first. Several
-> stack choices here look like mistakes and are not, and that file is where the
-> reasoning lives.
+## Contents
+
+- [What it is](#what-it-is)
+- [What you can do](#what-you-can-do)
+- [Screenshots](#screenshots)
+- [Get the app](#get-the-app)
+- [Using it](#using-it)
+- [Accounts and badges](#accounts-and-badges)
+- [The rules, and why they exist](#the-rules-and-why-they-exist)
+- [Your privacy](#your-privacy)
+- [Not built yet](#not-built-yet)
+- [For developers](#for-developers)
 
 ---
 
-## Table of contents
+## What it is
 
-**For users**
+Central Luzon State University is well mapped in OpenStreetMap — 103 named
+buildings — and has essentially **zero** mapped restrooms. If you are new to
+campus, or just somewhere you do not usually go, finding one means asking
+someone.
 
-- [What it does](#what-it-does)
-- [Install the app](#install-the-app)
+Flushy Flash is a map of campus restrooms that students fill in themselves. Every
+pin was put there by someone who found one, and the community checks each other's
+work.
 
-**For developers**
-
-- [Stack](#stack)
-- [Quick start](#quick-start)
-- [Setup in detail](#setup-in-detail)
-  - [1. Prerequisites](#1-prerequisites)
-  - [2. Install dependencies](#2-install-dependencies)
-  - [3. Supply a Firebase config](#3-supply-a-firebase-config)
-  - [4. Deploy the security rules](#4-deploy-the-security-rules)
-  - [5. Seed the campus buildings](#5-seed-the-campus-buildings)
-  - [6. Build and run](#6-build-and-run)
-- [Scripts](#scripts)
-- [Environment variables](#environment-variables)
-
-**How it is built**
-
-- [Project layout](#project-layout)
-- [Data model](#data-model)
-- [Architecture notes](#architecture-notes)
-- [Conventions](#conventions)
-
-**Working on it**
-
-- [Verify before you push](#verify-before-you-push)
-- [CI and releases](#ci-and-releases)
-- [Troubleshooting](#troubleshooting)
-- [Project status](#project-status)
+**You do not need an account to use it.** Open the app and the map is there.
 
 ---
 
-## What it does
+## What you can do
 
-CLSU is well mapped in OpenStreetMap — 103 named buildings — and has essentially
-**zero** mapped restrooms. Flushy Flash closes that gap by letting students map
-them themselves.
-
-| | Feature |
+| | |
 |---|---|
-| 🗺️ | **Campus map** of student-submitted restrooms, each pin showing its own photo |
-| ⚡ | **Find the nearest one** — one tap on the centre action, no account needed |
-| 📷 | **Submit a restroom** — drop a pin, add up to 5 photos, say who may use it, describe how to get there |
-| ⭐ | **Reviews and ratings**, one per person per restroom |
+| 🗺️ | **See every restroom on campus**, each pin showing its own photo |
+| ⚡ | **Find the nearest one** — one tap, no account needed |
+| 📷 | **Add one to the map** — drop a pin, add photos, say who can use it |
+| ⭐ | **Rate and review** — one review each, always yours to edit |
+| ✅ | **Confirm the real ones**, and report the ones that are not there |
 | 🔖 | **Save** the ones you rely on |
-| 🎓 | **Verified-student badge**, derived from a confirmed `@clsu.edu.ph` address |
-
-**Browsing needs no account.** The map opens straight onto campus for anyone; an
-account is only required to contribute.
+| 🎓 | **CLSU student badge** once you confirm a campus email address |
 
 ---
 
-## Install the app
+## Screenshots
+
+<div align="center">
+
+| The map | A restroom |
+|:---:|:---:|
+| <img src="assets/screenshots/map.png" width="250" alt="Campus map with a restroom pin showing its photo and landmark" /> | <img src="assets/screenshots/restroom.png" width="250" alt="Restroom details: photos, directions, amenities, and whether it is verified" /> |
+| Pins carry their own photo and landmark. | Everything someone knew about it. |
+
+| Adding one | Placing the pin |
+|:---:|:---:|
+| <img src="assets/screenshots/submit.png" width="250" alt="The add-a-restroom form" /> | <img src="assets/screenshots/pick-location.png" width="250" alt="Full-screen pin placer naming the nearest building" /> |
+| Only the pin and a landmark are required. | Drag the map; the pin stays put. |
+
+</div>
+
+---
+
+## Get the app
 
 1. Download the latest APK from
    [**Releases**](https://github.com/yjaphzs/flushy-flash/releases).
 2. Open it on your Android phone.
 3. Allow installs from unknown sources when prompted — you only do this once.
 
-Requires **Android 7.0 or newer**. iOS builds are not published yet.
+Requires **Android 7.0 or newer**. There is no iOS build yet.
 
-Once installed, the app checks for newer releases itself and offers to
-download and install them — you only need to do the above once.
+After that the app keeps itself up to date: it checks for a newer release when
+you open it, tells you the download size, and waits for you to say yes. Nothing
+downloads on its own. You can also check any time from **Settings → App version**.
 
 > [!NOTE]
 > **Samsung phones may block the install outright.** One UI 6.1 and newer ship
@@ -97,10 +102,211 @@ download and install them — you only need to do the above once.
 > or install from a phone without it.
 
 > [!IMPORTANT]
-> Only an APK signed with the same release key can replace an installed one.
-> A build you compiled yourself cannot update a Releases install, and vice
-> versa — Android reports both as a bare "App not installed". Uninstall first
-> if you are switching between them.
+> Only an APK signed with the same key can replace an installed one. A build you
+> compiled yourself cannot update a Releases install, and vice versa — Android
+> reports both as a bare "App not installed". Uninstall first if you are
+> switching between them.
+
+---
+
+## Using it
+
+### Find a restroom
+
+Open the app. The map opens on campus and every pin is a restroom someone added.
+Zoom in and the pins grow into cards showing the photo, the landmark, the rating,
+and whether the community has confirmed it.
+
+**Tap a pin** for the details: how far away it is, when it was last updated,
+photos, directions to the door, what it has (water, tissue, bidet, accessible),
+and who it is for.
+
+**In a hurry?** Tap the ✨ button in the middle of the bottom bar. It finds the
+nearest one that is open and flies the map to it. No account needed — finding a
+toilet should not require signing up.
+
+### Add one to the map
+
+Tap **+** on the map, or **Add a restroom** on your profile.
+
+1. **Choose on the map** opens a full-screen picker. Drag the map so the pin
+   lands on the *door*, not the middle of the building — that is what helps the
+   next person. It tells you which building you are over as you move.
+2. **Add up to 5 photos.** The entrance is the most useful one.
+3. Say **who can use it** — Men, Women, Anyone, or Accessible only.
+4. Give it a **landmark** someone who has never been there would recognise
+   ("CLSU Lagoon"), and directions if it is hard to find ("behind the canteen,
+   past the east stairwell").
+5. Add the floor and whatever amenities you noticed.
+
+Only the pin and the landmark are required. Anything you are unsure about, leave
+blank — the app shows it as unknown rather than guessing.
+
+### Review one
+
+Open a restroom's own page — the button at the bottom of the map sheet — and tap
+**Write a review**. Rate it **Overall** and on **Cleanliness**, and add a note
+and photos if you like.
+
+**One review each, per restroom** — but it is always yours. Come back any time to
+edit it or delete it.
+
+### Help keep the map honest
+
+Every restroom starts out unconfirmed. On any restroom you did not add yourself,
+you will see two buttons:
+
+- **I found it** — you went, and it is there.
+- **It's not there** — you went, and it is not.
+
+Two confirmations from students with a confirmed campus address mark a restroom
+as **Verified by students**. Enough reports and it disappears from the map.
+
+You cannot vote on your own restroom, and **nobody can see who voted** — only the
+totals. Changed your mind? Press the same button again to take your vote back.
+
+### Save the ones you rely on
+
+On a restroom's own page, tap the **♥** beside *Write a review*. Saved ones
+collect under the ♥ tab in the bottom bar. Your list is private — nobody else can
+see it, and there is no public "saved by N people" count anywhere.
+
+### Keep track of what you added
+
+**Profile → Your restrooms** lists everything you have put on the map, with the
+ones still waiting for confirmation first.
+
+---
+
+## Accounts and badges
+
+**Browsing needs no account at all.** Without signing in you can use the map, tap
+any pin, read every review, find the nearest restroom, and update the app.
+
+You need an account to **contribute** — adding a restroom, reviewing, confirming
+or reporting, and saving favourites. When you tap one of those, the app explains
+what you were reaching for and offers to set you up. Finish, and it drops you
+back exactly where you were.
+
+Signing up takes an email and a password, or your Google account. You then pick a
+display name and an **@handle**, which is what other students see on your reviews.
+
+> [!NOTE]
+> Your @handle cannot be changed later. Pick one you are happy with.
+
+### The student badge
+
+Confirm an email address on a CLSU domain — `clsu.edu.ph` or `clsu2.edu.ph` — and
+your profile reads **CLSU student**. Anything else reads **Outsider**. Neither is
+a judgement; plenty of students sign in with a personal Google account and land
+on the second one.
+
+The badge matters for one thing: **only confirmed students' confirmations count**
+toward verifying a restroom. Anyone can confirm, and the number shown is honest
+about how many people did, but it takes students to settle it.
+
+> [!IMPORTANT]
+> The badge needs **both** a campus address *and* a confirmed one. If confirming
+> a restroom does not seem to count, check **Settings → Student verification** —
+> your email is probably not confirmed yet.
+
+---
+
+## The rules, and why they exist
+
+Everything here is enforced by the app, not a guideline.
+
+| Rule | What it means |
+|---|---|
+| **3 restrooms waiting at once** | Three *unconfirmed* ones. A restroom stops counting the moment it is verified — or if it gets hidden, or you delete it — and you have the slot back. |
+| **2 student confirmations** | What it takes to verify a restroom. |
+| **3 reports** | Hides a restroom — but only if the reports outnumber the confirmations. |
+| **7 days** | How long a hidden restroom waits before it is deleted. Confirmations in that week bring it straight back. |
+| **5 photos** | Per restroom, and per review. |
+| **2,000 characters** | Per review. |
+| **One review** | Per person, per restroom. Yours to edit forever. |
+
+**The three-restroom limit is not there to slow you down.** It is there so one
+person cannot fill the map with junk faster than anyone can check it. Add real
+restrooms and you will never notice it — they get confirmed and the slots come
+back.
+
+**A report is not a veto.** Three reports only hide a restroom if they outnumber
+the confirmations, because a confusing entrance is not a fake one.
+
+**You can delete a restroom you added**, but only while nobody else has reviewed
+or confirmed it. After that it belongs to everyone who relies on it, and the
+button disappears.
+
+### Deleting your account
+
+**Settings → Delete account.** Your profile, your saved list and your @handle are
+deleted, and the @handle becomes free for someone else to take.
+
+The restrooms and reviews you contributed **stay on the map**, under an anonymous
+name. Other students rely on them, and removing them would punish people who
+never did anything wrong. They are no longer linked to you.
+
+---
+
+## Your privacy
+
+- **Photos are stripped of their location data** before upload, so a photo you
+  took at home does not tell everyone where you live. They are resized too, so
+  uploading does not eat your data.
+- **Nobody can see who confirmed or reported** a restroom — only the totals. On a
+  campus where a handle is a name, that matters.
+- **Your saved restrooms are yours alone.** There is no public count.
+- **The app never asks for your location just because you opened it.** It asks
+  when you tap ✨ to find the nearest one, or the locate button while placing a
+  pin — and never in the background.
+
+What *is* public: your display name, @handle, profile photo and badge, and any
+restroom or review you contribute.
+
+---
+
+## Not built yet
+
+Being honest about what is in the app and does nothing yet:
+
+- **The alerts tab is empty**, always. It is a placeholder so the layout is
+  settled; this version sends no notifications.
+- **You cannot edit a restroom after adding it** — not the directions, not the
+  amenities, not whether it is out of order. Deleting it (while untouched) is the
+  only correction available. This is the biggest gap.
+- **Open / Out of order / Closed** shows on every restroom but nothing can change
+  it, so everything reads as open.
+- **No following other students**, and no list of your own reviews.
+
+---
+
+<div align="center">
+
+*Everything below is about building the project. If you just want the app,
+[download it here](https://github.com/yjaphzs/flushy-flash/releases).*
+
+</div>
+
+# For developers
+
+> [!NOTE]
+> **Working on this with an AI agent?** Read [AGENTS.md](./AGENTS.md) first.
+> Several stack choices here look like mistakes and are not, and that file is
+> where the reasoning lives.
+
+- [Stack](#stack)
+- [Quick start](#quick-start)
+- [Setup in detail](#setup-in-detail)
+- [Scripts](#scripts)
+- [Environment variables](#environment-variables)
+- [Project layout](#project-layout)
+- [Data model](#data-model)
+- [Architecture notes](#architecture-notes)
+- [Conventions](#conventions)
+- [Verify before you push](#verify-before-you-push)
+- [CI and releases](#ci-and-releases)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -242,7 +448,7 @@ Do this **before** running the app against a real project. The rules are the
 actual security boundary, not a formality:
 
 ```bash
-npm run test:rules     # prove them first — 70 adversarial cases
+npm run test:rules     # prove them first — 133 adversarial cases
 npm run deploy:rules   # firestore rules + indexes, RTDB, storage
 ```
 
@@ -322,11 +528,15 @@ the UDID, then `eas build --profile development -p ios`.
 | `npm run prebuild` | config check → `expo prebuild --clean` → Android build config |
 | `npm run prebuild:android` | the same, Android only (faster) |
 | `npm run typecheck` | app only |
-| `npm run typecheck:all` | app + `scripts/` + `rules/` — all three have their own tsconfig |
+| `npm run typecheck:all` | app + `scripts/` + `rules/` + `functions/` — four tsconfigs |
 | `npm run lint` | includes the import firewall |
-| `npm test` | jest (unit + component) |
-| `npm run test:rules` | the 70-case attack matrix against the Firestore emulator |
+| `npm test` | jest (unit + component). `npm run test:watch` leaves it running |
+| `npm run test:rules` | the 133-case attack matrix against the Firestore emulator |
 | `npm run deploy:rules` | Firestore rules + indexes, RTDB, Storage |
+| `npm run deploy:functions` | build `functions/` and deploy the triggers |
+| `npm run grant:admin` | `-- --email you@example.com` — sets the admin claim. **Nothing else grants it** |
+| `npm run backfill:trust` | recompute the vote aggregates and `pendingRestroomCount` on documents written before the triggers existed |
+| `npm run doctor` | `expo-doctor`, which catches SDK version drift that typecheck and lint miss |
 | `npm run seed:buildings` | fetch CLSU buildings from OpenStreetMap |
 | `npm run firebase:sdkconfig` | re-pull `google-services.json` |
 | `npm run firebase:placeholder` | write a fake config for emulator-only work |
@@ -385,7 +595,8 @@ src/
     common/         app-wide composites that know this app's brand or domain
     forms/          field, text-field
     feedback/       callout, empty-state
-  features/         domain logic: auth, buildings, restrooms, likes, reviews, profile
+  features/         domain logic: auth, buildings, restrooms, likes, reviews,
+                    profile, users, updates
     <domain>/components/   domain components, colocated with their api.ts
   stores/           Zustand state (selector hooks, not Context)
   hooks/            auth listener, campus data subscriptions, location
@@ -394,8 +605,10 @@ src/
 
 scripts/            Node tooling (OSM building seed, build config). Own tsconfig.
 rules/              the security-rules test package. Own node_modules, own tsconfig.
+functions/          Cloud Functions. Isolated for the same reason: firebase-admin
+                    must never become importable from app code.
 plugins/            Expo config plugins (release signing)
-assets/             brand artwork, icons, Lottie animations
+assets/             brand artwork, icons, Lottie animations, README screenshots
 ```
 
 **Buckets have one rule:** `ui/` wraps exactly one upstream component each and
@@ -412,6 +625,7 @@ Firestore collections, with types in `src/lib/types.ts`:
 | `buildings` | public | **admin only** — seeded from OSM |
 | `restrooms` | public | any signed-in member |
 | `reviews` | public | author only, id is `${restroomId}_${uid}` |
+| `restroomVotes` | **owner only** | owner, id is `${restroomId}_${uid}`. No update path |
 | `users` | public | self |
 | `users/{uid}/private` | self | self — anything personal lives here |
 | `handles` | public | claimed atomically with the profile |
@@ -428,14 +642,28 @@ Four invariants the rules enforce — **preserve these if you edit
 2. **Reviews use a composite id**, which is what makes "one review per user per
    restroom" unforgeable without a query or a race.
 3. **The verified-student badge derives from the auth token's own claims**
-   (`email_verified` + the CLSU domain), never from a client-written field.
+   (`email_verified` + a CLSU domain), never from a client-written field. There
+   are **two** domains — `clsu.edu.ph` and `clsu2.edu.ph` — and the predicate
+   lives in exactly two places that must move together: `CLSU_EMAIL_DOMAINS` in
+   `src/lib/campus.ts`, and the regex in `isVerifiedStudent()` in
+   `firestore.rules`. A drift there is not a wrong badge — it is a bare
+   `permission-denied` that breaks profile creation.
 4. **`hasOnly()` locks every document shape.** A new field added to the app without
    being added to the rules is rejected. That is the intended failure direction.
 
+`restroomVotes` reads are **owner-scoped**, unlike every other public collection
+here. Learning who reported your restroom is the beginning of retaliation, and a
+handle on this campus is a name — so only the aggregate is public, on the
+restroom itself. There is no update path either: changing your mind is a delete
+then a create, so `byStudent` cannot be re-evaluated against a token that has
+since changed.
+
 There is **no `notifications` collection**, and that is not an oversight — a
 notification is written *by* one user *into* another user's inbox, and any rule
-permissive enough to allow that is a spam vector. The honest writer is a Cloud
-Function, which needs the Blaze plan. The tab ships as an empty state meanwhile.
+permissive enough to allow that is a spam vector. The only honest writer is a
+Cloud Function with admin credentials; the document shape it would take is
+spelled out in [AGENTS.md §7](./AGENTS.md). The tab ships as an empty state
+meanwhile.
 
 ---
 
@@ -495,14 +723,31 @@ person who took it, and these images are readable by anyone with the link.
 </details>
 
 <details>
-<summary><b>Ratings are computed, not denormalised</b></summary>
+<summary><b>Ratings are recomputed by a trigger, never incremented</b></summary>
 
 <br>
 
-Ratings are read live via `getAggregateFromServer`, so **no Cloud Function and no
-Blaze plan are needed yet**. `ratingSum` / `ratingCount` already exist on the
-document and already reject client writes, so moving to a Function later is
-purely additive — no migration, no rules change.
+`functions/src/rating-aggregate.ts` recomputes `restrooms.ratingSum` /
+`ratingCount` on every `reviews/{reviewId}` write. That is what puts `★ 4.2 ·12`
+on a map pin.
+
+It **recomputes** rather than applying a delta, which costs one query per review
+write and buys correctness a delta cannot: Functions deliver *at least* once, so
+a retried `+1` double-counts permanently and silently, and a dropped one
+under-counts forever. A recomputation heals on the next write.
+
+Both fields still reject client writes — the trigger runs with admin credentials.
+
+Two things to know before touching it:
+
+- **A restroom reviewed before the trigger deployed still reads 0** until someone
+  writes a review on it. That is why `pinRating()` returns `null` at
+  `ratingCount === 0` rather than an average of zero, and why `score-bar.tsx`
+  still pays for `getAggregateFromServer` instead of reading the document.
+- **The rating is part of the map annotation's React key.** Android bakes a
+  `ViewAnnotation`'s children into a bitmap and will not repaint on a
+  content-only change, so a rating arriving on a live snapshot would otherwise
+  never appear — see [AGENTS.md §4](./AGENTS.md).
 
 </details>
 
@@ -547,11 +792,12 @@ These are **enforced, not aspirational** — `npm run lint` fails on violations.
 ## Verify before you push
 
 ```bash
-npm run typecheck:all    # app + scripts + rules (three separate tsconfigs)
+npm run typecheck:all    # app + scripts + rules + functions (four tsconfigs)
 npm run lint             # includes the import firewall
 npm test
+npm --prefix functions test   # functions/ is a separate package with its own jest
 npx expo-doctor          # expect 21/21
-npm run test:rules       # 70 security-rule cases — needs Java
+npm run test:rules       # 133 security-rule cases — needs JDK 21+
 ```
 
 For anything touching styling, also bundle it — Uniwind failures show up as
@@ -589,15 +835,32 @@ merges by PR.
 
 ### Cutting a release
 
+`main` is protected, so the version bump lands by PR like everything else and the
+tag is pushed **afterwards**, onto the merged commit:
+
 ```bash
+git switch -c chore/release-v1.1.0
 npm version minor --no-git-tag-version   # then match expo.version in app.json
 git commit -am "chore: release v1.1.0"
-git tag v1.1.0
-git push origin main --tags
+git push -u origin chore/release-v1.1.0
+gh pr create --fill && gh pr merge --squash   # after CI goes green
+
+git switch main && git pull                   # pick up the squashed commit
+git tag v1.1.0 && git push origin v1.1.0      # this is what triggers the release
 ```
+
+> [!WARNING]
+> **Tag the commit that carries the bump.** `release.yml` stamps `app.json` from
+> the TAG NAME before prebuild, so a tag placed on an earlier commit still
+> produces an APK labelled `v1.1.0` — with the wrong code inside it, and nothing
+> failing anywhere.
 
 The workflow sets `versionCode` from the run number — monotonic, which Android
 requires for in-place upgrades. **Do not set it by hand.**
+
+To rebuild a tag that already exists (a CI failure, a rotated secret), use
+**Actions → release → Run workflow** and give it the tag. Delete the draft Release
+first if one was produced, or the asset upload collides.
 
 Release builds need these repo secrets: `GOOGLE_SERVICES_JSON`,
 `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
@@ -709,31 +972,6 @@ pull in their own `@firebase/app-compat`, and the duplicate copies break
 rules-unit-testing with `getApp(...).firestore is not a function`.
 
 </details>
-
----
-
-## Project status
-
-**Working**
-
-Guest-first browsing · sign up / in / out · email verification · password reset ·
-Google Sign-In · verified-student badge · the write gate · campus map with restroom
-pins · restroom submission with photos · restroom and building detail · saved
-restrooms · security rules (70 cases, passing) · the OSM seed pipeline.
-
-**Stubbed — safe places to pick up**
-
-- The **review composer** — `src/app/(app)/review/[restroomId].tsx`
-- **Notifications** — `src/app/(app)/(tabs)/notifications.tsx`, blocked on Cloud
-  Functions ([see above](#data-model))
-- **RTDB live status** — the "is it occupied right now" idea
-
-**Deliberately not built**
-
-A feed of strangers' reviews. Five slots is the practical maximum for a bottom bar,
-and a feed is weak until there is a real user base. The follow graph, its rules and
-its index are all retained; when the query ships it belongs as a *Following* segment
-on Profile, not a primary tab.
 
 ---
 
