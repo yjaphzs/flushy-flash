@@ -36,3 +36,16 @@ export function pinRating(restroom: Restroom): PinRating | null {
 export function pinRatingKey(rating: PinRating | null): string {
   return rating ? `${rating.average.toFixed(1)}/${rating.count}` : 'unrated';
 }
+
+/**
+ * Everything about a restroom that changes what its pin DRAWS.
+ *
+ * ⚠️ Same hazard as `pinRatingKey`, and `verified` is the worse case of the
+ * two. It flips on a live snapshot the moment `onVoteWritten` recomputes —
+ * a pure content change at an identical size, which is exactly what Android
+ * refuses to repaint. A badge left out of this key would simply never appear
+ * for anyone already looking at the map.
+ */
+export function pinKey(photoUrl: string | null, rating: PinRating | null, verified: boolean) {
+  return `${photoUrl ?? 'glyph'}|${pinRatingKey(rating)}|${verified ? 'v' : 'u'}`;
+}
