@@ -16,6 +16,7 @@ import {
 } from '@/features/notifications/components/notification-row';
 import { useCanWrite } from '@/stores/auth-store';
 import { useBuildings, useRestrooms } from '@/stores/campus-store';
+import { useIsOnline } from '@/stores/connection-store';
 import {
   useNotifications,
   useNotificationsError,
@@ -47,6 +48,7 @@ export default function NotificationsScreen() {
   const items = useNotifications();
   const loading = useNotificationsLoading();
   const error = useNotificationsError();
+  const online = useIsOnline();
   const restrooms = useRestrooms();
   const buildings = useBuildings();
 
@@ -119,6 +121,25 @@ export default function NotificationsScreen() {
           title="Could not load your alerts"
           description={error}
           testID="notifications-error"
+        />
+      </Screen>
+    );
+  }
+
+  /*
+    Also before the empty branch, and for the same reason the error branch is.
+    Offline the listener does not error — Firestore serves the disk cache — so a
+    phone that has never opened this tab reaches "Nothing yet" with a perfectly
+    healthy inbox sitting on the server.
+  */
+  if (items.length === 0 && !online) {
+    return (
+      <Screen style={{ paddingBottom: clearance }}>
+        <EmptyState
+          icon="wifi-off"
+          title="You're offline"
+          description="Your alerts will be here once you have a connection."
+          testID="notifications-offline"
         />
       </Screen>
     );

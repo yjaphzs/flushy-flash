@@ -14,6 +14,7 @@ import {
 } from '@/features/restrooms/components/restroom-row';
 import { useCanWrite } from '@/stores/auth-store';
 import { useBuildings, useRestrooms } from '@/stores/campus-store';
+import { useIsOnline } from '@/stores/connection-store';
 import { useLikedIds, useLikesLoading } from '@/stores/likes-store';
 
 export default function LikesScreen() {
@@ -23,6 +24,7 @@ export default function LikesScreen() {
   const requestWrite = useRequestWrite();
   const likedIds = useLikedIds();
   const loading = useLikesLoading();
+  const online = useIsOnline();
   const restrooms = useRestrooms();
   const buildings = useBuildings();
 
@@ -70,6 +72,24 @@ export default function LikesScreen() {
         <View className="flex-1 items-center justify-center">
           <Spinner />
         </View>
+      </Screen>
+    );
+  }
+
+  /*
+    Before the empty branch. This list is a join of two stores, so a cold cache
+    with no signal empties it without anything failing — and "Nothing saved yet"
+    is a statement about what the user has done, not about the connection.
+  */
+  if (saved.length === 0 && !online) {
+    return (
+      <Screen style={{ paddingBottom: clearance }}>
+        <EmptyState
+          icon="wifi-off"
+          title="You're offline"
+          description="Your saved restrooms will be here once you have a connection."
+          testID="likes-offline"
+        />
       </Screen>
     );
   }

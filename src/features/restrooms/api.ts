@@ -17,14 +17,25 @@ import { COLLECTIONS, db } from '@/lib/firebase';
 import type { LatLng } from '@/lib/campus';
 import type { Amenities, Restroom } from '@/lib/types';
 
-/** Full-collection listener — see the note in features/buildings/api.ts. */
+/**
+ * Full-collection listener — see the note in features/buildings/api.ts.
+ *
+ * `onMeta` receives `snapshot.metadata.fromCache`, which is how the app knows
+ * it is offline without a native network module — see `stores/connection-store.ts`.
+ * `includeMetadataChanges` is what makes a snapshot fire on the connection flip
+ * itself; without it the listener stays silent until a document changes, which
+ * offline it never does.
+ */
 export function subscribeToRestrooms(
   onChange: (restrooms: Restroom[]) => void,
   onError: (error: Error) => void,
+  onMeta?: (fromCache: boolean) => void,
 ) {
   return onSnapshot(
     collection(db, COLLECTIONS.restrooms),
+    { includeMetadataChanges: true },
     (snap) => {
+      onMeta?.(snap.metadata.fromCache);
       onChange(
         snap.docs.map((d) => {
           const data = d.data();

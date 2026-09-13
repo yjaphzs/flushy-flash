@@ -15,6 +15,15 @@ export type CalloutProps = {
   tone: CalloutTone;
   /** Never a bare string — wrap copy in <Text>, per the compound-component rule. */
   children: Exclude<React.ReactNode, string | number>;
+  /**
+   * Overrides the tone's glyph, keeping its colour.
+   *
+   * For states the tone cannot express on its own: offline is `info`-toned but
+   * an alert circle says "something is wrong here", where `wifi-off` says what
+   * is actually true. Tone still owns the colour, so this cannot be used to
+   * paint a danger message in a calm one.
+   */
+  icon?: IconName;
   className?: string;
   testID?: string;
 };
@@ -30,7 +39,7 @@ export type CalloutProps = {
  * The live region matters: the message appears without focus moving, so without
  * it a screen-reader user submits the form and hears nothing at all.
  */
-export function Callout({ tone, children, className, testID }: CalloutProps) {
+export function Callout({ tone, children, icon, className, testID }: CalloutProps) {
   const spec = TONES[tone];
 
   return (
@@ -41,7 +50,7 @@ export function Callout({ tone, children, className, testID }: CalloutProps) {
       testID={testID}
     >
       <View className="pt-0.5">
-        <Icon name={spec.icon} size={18} color={spec.iconColor} />
+        <Icon name={icon ?? spec.icon} size={18} color={spec.iconColor} />
       </View>
       <View className="flex-1">{children}</View>
     </View>

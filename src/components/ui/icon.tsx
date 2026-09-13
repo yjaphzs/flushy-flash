@@ -31,6 +31,7 @@ import Star from 'lucide-react-native/icons/star';
 import User from 'lucide-react-native/icons/user';
 import UserRound from 'lucide-react-native/icons/user-round';
 import XMark from 'lucide-react-native/icons/x';
+import WifiOff from 'lucide-react-native/icons/wifi-off';
 import { useCSSVariable } from 'uniwind';
 
 import { View } from '@/components/ui/view';
@@ -85,7 +86,9 @@ export type IconName =
   | 'clock'
   | 'image'
   | 'search'
-  | 'filter';
+  | 'filter'
+  // Offline. See stores/connection-store.ts for how the app knows.
+  | 'wifi-off';
 
 /** `typeof Heart` rather than importing LucideIcon — one fewer specifier. */
 type Glyph = typeof Heart;
@@ -140,6 +143,7 @@ const GLYPHS: Record<IconName, Glyph> = {
   image: ImageIcon,
   search: Search,
   filter: SlidersHorizontal,
+  'wifi-off': WifiOff,
 };
 
 /** Theme tokens an icon may be tinted with, including this app's own. */

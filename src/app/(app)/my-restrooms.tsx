@@ -10,6 +10,7 @@ import {
   useScreenTopClearance,
 } from '@/components/layouts/tab-bar-metrics';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
@@ -20,7 +21,8 @@ import {
 } from '@/features/restrooms/components/restroom-row';
 import { PENDING_CAP } from '@/features/restrooms/pending-quota';
 import { useUid } from '@/stores/auth-store';
-import { useBuildings, useRestrooms } from '@/stores/campus-store';
+import { useBuildings, useCampusLoading, useRestrooms } from '@/stores/campus-store';
+import { useIsOnline } from '@/stores/connection-store';
 import type { Restroom } from '@/lib/types';
 
 /**
@@ -75,6 +77,8 @@ export default function MyRestroomsScreen() {
   const uid = useUid();
   const restrooms = useRestrooms();
   const buildings = useBuildings();
+  const loading = useCampusLoading();
+  const online = useIsOnline();
   const topInset = useScreenTopClearance();
   // No tab bar on this route, and Screen pads nothing — the list owns it.
   const paddingBottom = useScreenBottomClearance();
@@ -130,28 +134,60 @@ export default function MyRestroomsScreen() {
     </View>
   );
 
+  /*
+    ⚠️ **An empty list has three causes here and they are not interchangeable.**
+    This screen derives its rows from `campus-store`, so it is empty before the
+    snapshot lands and empty when the snapshot came from an empty disk cache —
+    and until now both rendered "Nothing added yet", which is a claim about what
+    the user has contributed. Offline is checked FIRST because it is the durable
+    one: a cold cache with no signal never stops being empty, so a spinner there
+    would spin forever and the empty state would be a lie about their own work.
+  */
+  const shell = (content: React.ReactNode) => (
+    <Screen>
+      <View className="px-5" style={{ paddingTop: topInset }}>
+        <BackButton onPress={() => router.back()} color="foreground" />
+      </View>
+      {content}
+    </Screen>
+  );
+
+  if (rows.length === 0 && !online) {
+    return shell(
+      <EmptyState
+        icon="wifi-off"
+        title="You're offline"
+        description="Your restrooms are on the way — this list fills in once you have a connection."
+        testID="my-restrooms-offline"
+      />,
+    );
+  }
+
+  if (rows.length === 0 && loading) {
+    return shell(
+      <View className="flex-1 items-center justify-center">
+        <Spinner />
+      </View>,
+    );
+  }
+
   if (rows.length === 0) {
-    return (
-      <Screen>
-        <View className="px-5" style={{ paddingTop: topInset }}>
-          <BackButton onPress={() => router.back()} color="foreground" />
-        </View>
-        <EmptyState
-          icon="map-pin"
-          title="Nothing added yet"
-          description="Restrooms you put on the map show up here, with whether the community has confirmed them."
-          action={
-            <Button
-              size="lg"
-              className="rounded-full"
-              onPress={() => requestWrite({ href: '/submit', reason: 'add' })}
-            >
-              <Button.Label>Add a restroom</Button.Label>
-            </Button>
-          }
-          testID="my-restrooms-empty"
-        />
-      </Screen>
+    return shell(
+      <EmptyState
+        icon="map-pin"
+        title="Nothing added yet"
+        description="Restrooms you put on the map show up here, with whether the community has confirmed them."
+        action={
+          <Button
+            size="lg"
+            className="rounded-full"
+            onPress={() => requestWrite({ href: '/submit', reason: 'add' })}
+          >
+            <Button.Label>Add a restroom</Button.Label>
+          </Button>
+        }
+        testID="my-restrooms-empty"
+      />,
     );
   }
 

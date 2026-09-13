@@ -5,6 +5,7 @@ import { subscribeToRestrooms } from '@/features/restrooms/api';
 import { firestoreErrorMessage } from '@/lib/firestore-errors';
 import { useUid } from '@/stores/auth-store';
 import { useCampusStore } from '@/stores/campus-store';
+import { useConnectionStore } from '@/stores/connection-store';
 
 /** First automatic retry. Doubles per consecutive failure, capped at 30s. */
 const RETRY_MS = 4000;
@@ -31,6 +32,11 @@ const MAX_RETRY_MS = 30_000;
  * Public reads do NOT make (1) moot. Offline, quota exhaustion and any future
  * rules tightening reproduce it exactly; opening the rules only removed the most
  * likely trigger.
+ *
+ * It is also the app's only connectivity reporter. Both listeners pass
+ * `snapshot.metadata.fromCache` to `connection-store`, which is what every
+ * "you are offline" surface reads — see that file for why this is preferred to
+ * a network module.
  */
 export function useCampusData() {
   const uid = useUid();
@@ -47,6 +53,14 @@ export function useCampusData() {
     let live = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    // Both listeners report, and either one proving a server round-trip is
+    // enough to clear the offline state. They share one Firestore client, so
+    // they flip together anyway — taking whichever speaks last is self-healing
+    // rather than a race.
+    const onMeta = (fromCache: boolean) => {
+      if (live) useConnectionStore.getState().report(fromCache);
+    };
+
     // By the time this runs the listener is already detached, so there is
     // nothing to unsubscribe — a fresh subscription is the only recovery.
     const fail = (e: unknown) => {
@@ -59,12 +73,15 @@ export function useCampusData() {
       }, delay);
     };
 
-    const unsubBuildings = subscribeToBuildings(setBuildings, fail);
-    const unsubRestrooms = subscribeToRestrooms(setRestrooms, fail);
+    const unsubBuildings = subscribeToBuildings(setBuildings, fail, onMeta);
+    const unsubRestrooms = subscribeToRestrooms(setRestrooms, fail, onMeta);
 
     return () => {
       live = false;
       clearTimeout(timer);
+      // Back to optimistic: a re-subscribe is about to re-establish the truth,
+      // and leaving a stale "offline" up during it would be its own lie.
+      useConnectionStore.getState().reset();
       unsubBuildings();
       unsubRestrooms();
     };
