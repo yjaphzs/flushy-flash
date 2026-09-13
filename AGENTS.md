@@ -172,7 +172,7 @@ in `src/app/_layout.tsx`: a rule with a carve-out is a rule people stop trusting
   three or more call sites into `src/components/`.
 
   Tests and `scripts/` are deliberately outside the rule — `rules/firestore.test.ts`
-  (the 70-case attack matrix) and `scripts/seed-buildings.ts` are both legitimately
+  (the 133-case attack matrix) and `scripts/seed-buildings.ts` are both legitimately
   longer, and an exhaustive test table is not the readability problem this targets.
 
 ---
@@ -1071,7 +1071,7 @@ land, and so does the splash colour change already made.
 
 Not yet done: photo upload to Storage and RTDB live status.
 
-The rules attack matrix now exists and passes (70 cases, `rules/firestore.test.ts`),
+The rules attack matrix now exists and passes (133 cases, `rules/firestore.test.ts`),
 so §7's "written but unproven" caveat is closed. It earned its keep immediately by
 catching a real bug: `isAdmin()` read `request.auth.token.admin` directly, which
 **raises an evaluation error** rather than returning false when the claim is
