@@ -96,4 +96,41 @@ describe('map focus store', () => {
     // The camera target survives: dismissing a message must not undo the move.
     expect(s.focus).toMatchObject(POINT);
   });
+
+  /**
+   * Tapping a search result. The camera has to move without any of the
+   * nearest-search machinery firing — no spinner dialog, no green banner in the
+   * band the search bar now occupies.
+   */
+  describe('focusOn', () => {
+    it('moves the camera without starting a search', () => {
+      useMapFocusStore.getState().focusOn(POINT);
+
+      const s = useMapFocusStore.getState();
+      expect(s.focus).toMatchObject(POINT);
+      expect(s.outcome).toBe('idle');
+      expect(s.label).toBeNull();
+    });
+
+    // Same reason succeed() bumps it: choosing the same result twice must
+    // re-fire the camera rather than be swallowed as an equal value.
+    it('bumps the nonce so a repeat re-fires', () => {
+      const { focusOn } = useMapFocusStore.getState();
+      focusOn(POINT);
+      const first = useMapFocusStore.getState().focus?.nonce;
+
+      focusOn(POINT);
+      expect(useMapFocusStore.getState().focus?.nonce).toBeGreaterThan(first!);
+    });
+
+    // It is not attempt-gated, unlike succeed() — there is no attempt to gate.
+    it('is not cancelled by an in-flight search being abandoned', () => {
+      const { begin, cancel, focusOn } = useMapFocusStore.getState();
+      begin();
+      cancel();
+
+      focusOn(POINT);
+      expect(useMapFocusStore.getState().focus).toMatchObject(POINT);
+    });
+  });
 });
