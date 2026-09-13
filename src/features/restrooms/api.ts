@@ -2,6 +2,7 @@ import {
   average,
   collection,
   count,
+  deleteDoc,
   doc,
   GeoPoint,
   getAggregateFromServer,
@@ -72,6 +73,24 @@ export async function fetchRatingSummary(restroomId: string) {
   );
   const data = snap.data();
   return { average: data.avg ?? null, count: data.total ?? 0 };
+}
+
+/**
+ * Removes a restroom the author added and nobody else has invested in.
+ *
+ * The rules decide, not this function: `allow delete` requires
+ * `ratingCount == 0 && confirmCount == 0` on top of authorship, so a call for
+ * an entry that has picked up a review or a confirmation comes back
+ * `permission-denied` rather than quietly doing nothing.
+ *
+ * ⚠️ **Deletes the DOCUMENT only.** Its photos, reviews, votes and likes are
+ * removed by the `onRestroomDeleted` Cloud Function, so the author deleting
+ * their own entry and the scheduled purge of a hidden one cannot drift apart.
+ * Doing it here would also be a client deleting other people's reviews, which
+ * the rules rightly refuse.
+ */
+export function deleteRestroom(restroomId: string) {
+  return deleteDoc(doc(db, COLLECTIONS.restrooms, restroomId));
 }
 
 export const EMPTY_AMENITIES: Amenities = {

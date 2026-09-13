@@ -28,6 +28,7 @@ import {
   usePinDraftStore,
 } from '@/stores/pin-draft-store';
 import { snapBuilding } from '@/features/restrooms/snap-building';
+import { usePendingQuota } from '@/features/restrooms/pending-quota';
 import type { LatLng } from '@/lib/campus';
 import type { Amenities, GenderedAs } from '@/lib/types';
 
@@ -110,7 +111,17 @@ export default function SubmitRestroomScreen() {
     if (id) router.back();
   }
 
-  const ready = Boolean(point) && landmark.trim().length > 0 && !form.busy;
+  /**
+   * The contribution cap, surfaced rather than discovered.
+   *
+   * `firestore.rules` refuses the create at three pending restrooms, so
+   * without this the user fills in a whole form, presses Save, and gets a
+   * permission error naming nothing they could have known in advance.
+   */
+  const quota = usePendingQuota(uid);
+
+  const ready =
+    Boolean(point) && landmark.trim().length > 0 && !form.busy && !quota.full;
 
   return (
     <FormScreen
@@ -119,6 +130,20 @@ export default function SubmitRestroomScreen() {
       onBack={() => router.back()}
       avoidsKeyboard
     >
+      {/*
+        Only once it matters. A quota line above an empty form on someone’s
+        first contribution is a rule looking for a rule-breaker; at two of
+        three it is genuinely useful information.
+      */}
+      {canWrite && quota.used > 0 ? (
+        <Text type="body-sm" color={quota.full ? undefined : 'muted'}
+          className={quota.full ? 'text-danger' : undefined}>
+          {quota.full
+            ? `You have ${quota.cap} restrooms waiting to be confirmed. Once students confirm one, you can add another.`
+            : `${quota.used} of ${quota.cap} pending. Verified restrooms do not count.`}
+        </Text>
+      ) : null}
+
       <PinField point={point} building={nearestBuilding} />
 
       <PhotoPicker

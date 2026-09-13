@@ -14,6 +14,7 @@ import {
 } from '@/features/restrooms/components/restroom-detail';
 import { PhotoStrip } from '@/features/restrooms/components/photo-strip';
 import { ScoreBar } from '@/features/restrooms/components/score-bar';
+import { TrustRow } from '@/features/restrooms/components/trust-row';
 import { useBuildings } from '@/stores/campus-store';
 import type { LatLng } from '@/lib/campus';
 import { distanceM } from '@/lib/geo';
@@ -172,6 +173,13 @@ function SheetBody({
       <AmenityGrid amenities={restroom.amenities} />
 
       <ScoreBar restroomId={restroom.id} />
+
+      {/*
+        Above the reviews button rather than below it: whether the place
+        exists at all is a more basic question than what it is like, and a
+        reader who cannot find it will not care about its rating.
+      */}
+      <TrustRow restroom={restroom} />
 
       <Button
         variant="secondary"

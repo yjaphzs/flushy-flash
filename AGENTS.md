@@ -892,6 +892,33 @@ confirmation scores 2 so one is enough.
 ⚠️ **A custom claim does not reach a signed-in device until its token
 refreshes** (up to an hour). Sign out and in, or call `refreshClaims()`.
 
+### The client half
+
+`TrustRow` is shared by the map sheet and `/restroom/[id]`, beside the other
+shared pieces, because two surfaces showing the same entity is how they drift.
+`DeleteRestroomRow` carries its own dialog, like `delete-account-row.tsx`, and
+**renders nothing** once the entry has a review or a confirmation — the rules
+refuse the delete then, so the button could only ever fail.
+
+⚠️ **`byStudent` / `byAdmin` come from `tokenVoteWeight()`, never the auth
+store.** The store follows the local `User` object, which flips `emailVerified`
+long before the ID token rotates; the rules compare against the token and demand
+equality, so a value guessed from the store is a flat `permission-denied` with
+nothing to say which clause failed. Same trap `tokenVerifiedStudent` documents.
+
+⚠️ **Changing a vote is delete-then-create, and `castVote` does both.** `setDoc`
+over an existing vote is an UPDATE as far as the rules are concerned, and update
+is denied outright — so switching confirm to report without the delete fails
+rather than flipping.
+
+**The submit form counts pending restrooms from `campus-store`**, not from
+`users/{uid}.pendingRestroomCount`. The store already holds every restroom, and
+more importantly the counter trails the trigger by a second or two: when the two
+disagree, the client is showing the truth and the counter is catching up.
+`PENDING_CAP` duplicates `pendingCap()` in the rules — no import crosses that
+line, so they move together or not at all, exactly like `CAMPUS_BOUNDS`.
+
+
 ### Cleanup, which never existed before
 
 `onRestroomDeleted` removes a restroom’s reviews, votes, likes and Storage

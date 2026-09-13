@@ -62,6 +62,37 @@ async function tokenVerifiedStudent(user: User): Promise<boolean> {
 }
 
 /**
+ * What a vote from this account is worth, read from the TOKEN.
+ *
+ * `restroomVotes.byStudent` / `byAdmin` are client-written and rules-forced
+ * to equal `isVerifiedStudent()` / `isAdmin()`, so these are not a display
+ * hint — writing a guess is a flat `permission-denied` with nothing to say
+ * which clause failed.
+ *
+ * Deliberately NOT derived from the auth store, for the same reason
+ * `tokenVerifiedStudent` above is not: the store follows the local `User`
+ * object, which flips `emailVerified` long before the ID token rotates. The
+ * rules evaluate the token.
+ *
+ * ⚠️ An `admin` claim granted by `npm run grant:admin` does not appear here
+ * until the token refreshes — up to an hour, or immediately after
+ * `refreshClaims()`. An admin whose token is stale simply votes as an
+ * ordinary user, which scores 0 rather than 2.
+ */
+export async function tokenVoteWeight(): Promise<{ byStudent: boolean; byAdmin: boolean }> {
+  const user = getAuth().currentUser;
+  if (!user) return { byStudent: false, byAdmin: false };
+
+  const { claims } = await user.getIdTokenResult();
+  const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : '';
+  return {
+    byStudent:
+      claims.email_verified === true && email.endsWith(`@${CLSU_EMAIL_DOMAIN}`),
+    byAdmin: claims.admin === true,
+  };
+}
+
+/**
  * The account's @handle, or null when it has no profile document yet.
  *
  * Null is the signal that routes a first-time Google user to the profile step:

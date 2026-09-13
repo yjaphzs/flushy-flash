@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { useAuthGateResume } from '@/features/auth/use-auth-gate';
 import { useCampusData } from '@/hooks/use-campus-data';
 import { useMyLikes } from '@/hooks/use-my-likes';
+import { useMyVotes } from '@/hooks/use-my-votes';
 import { UpdateDialog } from '@/features/updates/components/update-dialog';
 import { useUpdateCheck } from '@/features/updates/use-update-check';
 
@@ -19,6 +20,11 @@ export default function AppLayout() {
 
   // Keyed on uid: clears on sign-out, re-opens on sign-in.
   useMyLikes();
+
+  // Same shape, same reason: which restrooms this account has already vouched
+  // for or reported. Votes are owner-scoped, so this is the only way the trust
+  // row knows whether to show the action or the state.
+  useMyVotes();
 
   // Here rather than on a screen: (app) is permanently mounted, so a download
   // in flight survives navigation and the dialog never remounts mid-transfer.

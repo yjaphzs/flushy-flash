@@ -20,6 +20,7 @@ const HEADLINES: Record<WriteReason, string> = {
   add: 'Add a restroom',
   review: 'Write a review',
   like: 'Save this restroom',
+  confirm: 'Confirm this restroom',
   profile: 'Join Flushy Flash',
 };
 

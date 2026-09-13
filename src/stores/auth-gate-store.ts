@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 /** Why the gate opened. Drives the headline on the join screen. */
-export type WriteReason = 'add' | 'review' | 'like' | 'profile';
+export type WriteReason = 'add' | 'review' | 'like' | 'confirm' | 'profile';
 
 export type WriteIntent = {
   /** Where the user was heading before the gate interrupted them. */

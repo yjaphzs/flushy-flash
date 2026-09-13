@@ -142,6 +142,31 @@ export type Review = {
   updatedAt: Timestamp;
 };
 
+/**
+ * One person's verdict on whether a restroom is real.
+ *
+ * Composite id `${restroomId}_${uid}`, which is what makes one vote per user
+ * structural rather than something a query has to police.
+ */
+export type RestroomVote = {
+  id: string;
+  restroomId: string;
+  voterId: string;
+  kind: 'confirm' | 'report';
+  /**
+   * Whether the voter was a verified CLSU student when they voted.
+   *
+   * ⚠️ Written by the client but NOT trusted from it: `firestore.rules`
+   * requires both flags to equal the auth token, so a guess is a rejected
+   * write rather than an inflated score. Derive them with
+   * `tokenVoteWeight()`, never from the auth store — the store follows the
+   * local User object, which can be ahead of the token the rules evaluate.
+   */
+  byStudent: boolean;
+  byAdmin: boolean;
+  createdAt: Timestamp;
+};
+
 export type UserProfile = {
   id: string;
   /**

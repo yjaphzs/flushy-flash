@@ -15,7 +15,9 @@ import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { likeRestroom, unlikeRestroom } from '@/features/likes/api';
 import { fetchRatingSummary } from '@/features/restrooms/api';
+import { DeleteRestroomRow } from '@/features/restrooms/components/delete-restroom-row';
 import { PhotoStrip } from '@/features/restrooms/components/photo-strip';
+import { TrustRow } from '@/features/restrooms/components/trust-row';
 import { ReviewList } from '@/features/reviews/components/review-list';
 import { useRestroomReviews } from '@/features/reviews/use-restroom-reviews';
 import { useCanWrite, useUid } from '@/stores/auth-store';
@@ -180,6 +182,8 @@ export default function RestroomDetailScreen() {
                 </View>
               ) : null}
 
+              <TrustRow restroom={restroom} />
+
               <View className="flex-row gap-3">
                 <Button
                   className="flex-1"
@@ -189,6 +193,13 @@ export default function RestroomDetailScreen() {
                 </Button>
                 <LikeButton restroomId={restroom.id} uid={uid} canWrite={canWrite} />
               </View>
+
+              {/*
+                Last in the header, below everything constructive. Renders
+                nothing unless the viewer is the author AND nobody else has
+                engaged — see its docblock.
+              */}
+              <DeleteRestroomRow restroom={restroom} />
             </View>
           }
         />
