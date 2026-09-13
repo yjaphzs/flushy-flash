@@ -11,15 +11,16 @@ import { View } from '@/components/ui/view';
 import {
   TextField,
   TextFieldDescription,
-  TextFieldError,
   TextFieldInput,
   TextFieldLabel,
 } from '@/components/forms/text-field';
+import { FormMessage } from '@/components/feedback/form-message';
 import { EMPTY_AMENITIES } from '@/features/restrooms/api';
 import { useSubmitRestroom } from '@/features/restrooms/use-submit-restroom';
 import type { ComposerPhoto } from '@/features/reviews/use-review-form';
 import { JoinBenefits } from '@/features/auth/components/join-benefits';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
+import { useWriteBlock } from '@/hooks/use-write-block';
 import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useBuildings } from '@/stores/campus-store';
 import {
@@ -53,6 +54,7 @@ export default function SubmitRestroomScreen() {
   const uid = useUid();
   const canWrite = useCanWrite();
   const requestWrite = useRequestWrite();
+  const blocked = useWriteBlock();
   const form = useSubmitRestroom();
 
   const [floor, setFloor] = useState('1');
@@ -202,7 +204,6 @@ export default function SubmitRestroomScreen() {
         <TextFieldLabel>Floor</TextFieldLabel>
         <TextFieldInput value={floor} onChangeText={setFloor} keyboardType="number-pad" />
         <TextFieldDescription>Ground floor is 1.</TextFieldDescription>
-        {form.error ? <TextFieldError>{form.error}</TextFieldError> : null}
       </TextField>
 
       <View className="gap-2">
@@ -242,7 +243,14 @@ export default function SubmitRestroomScreen() {
         </View>
       )}
 
-      <Button size="lg" className="rounded-full" onPress={onSubmit} isDisabled={!ready || !canWrite}>
+      <FormMessage blocked={blocked} error={form.error} />
+
+      <Button
+        size="lg"
+        className="rounded-full"
+        onPress={onSubmit}
+        isDisabled={!ready || !canWrite || blocked !== null}
+      >
         <Button.Label>{form.progress ?? 'Save restroom'}</Button.Label>
       </Button>
     </FormScreen>

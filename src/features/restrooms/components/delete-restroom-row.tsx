@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
 
+import { FormMessage } from '@/components/feedback/form-message';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { deleteRestroom } from '@/features/restrooms/api';
-import { firestoreErrorMessage } from '@/lib/firestore-errors';
+import { useWriteBlock } from '@/hooks/use-write-block';
+import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useUid } from '@/stores/auth-store';
 import type { Restroom } from '@/lib/types';
 
@@ -35,6 +37,7 @@ export type DeleteRestroomRowProps = {
  */
 export function DeleteRestroomRow({ restroom }: DeleteRestroomRowProps) {
   const uid = useUid();
+  const blocked = useWriteBlock();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +55,7 @@ export function DeleteRestroomRow({ restroom }: DeleteRestroomRowProps) {
       // mounted behind this, and its listener drops the pin on its own.
       router.back();
     } catch (e) {
-      setError(firestoreErrorMessage(e));
+      setError(firebaseErrorMessage(e, 'delete'));
       setBusy(false);
     }
   }
@@ -94,18 +97,22 @@ export function DeleteRestroomRow({ restroom }: DeleteRestroomRowProps) {
                 </Text>
               </View>
 
-              {error ? (
-                <Text type="body-sm" className="text-danger">
-                  {error}
-                </Text>
-              ) : null}
+              {/*
+                Same argument as the docblock's, one level down: this dialog
+                deletes a document AND a Storage prefix, so offline it would
+                accept a destructive confirmation and show nothing for it. The
+                reason replaces the outcome rather than the button vanishing —
+                the trigger is already conditional on ownership, and a control
+                that disappears for a second reason is a control nobody trusts.
+              */}
+              <FormMessage blocked={blocked} error={error} />
 
               <View className="gap-2">
                 <Button
                   variant="danger"
                   size="lg"
                   className="rounded-full"
-                  isDisabled={busy}
+                  isDisabled={busy || blocked !== null}
                   onPress={() => void confirm()}
                 >
                   <Button.Label>{busy ? 'Removing…' : 'Remove it'}</Button.Label>

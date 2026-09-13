@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 
+import { Callout } from '@/components/feedback/callout';
+import { FormMessage } from '@/components/feedback/form-message';
 import { FormScreen } from '@/components/layouts/form-screen';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -9,7 +11,6 @@ import { View } from '@/components/ui/view';
 import {
   TextField,
   TextFieldDescription,
-  TextFieldError,
   TextFieldInput,
   TextFieldLabel,
 } from '@/components/forms/text-field';
@@ -24,6 +25,8 @@ import {
   saveReview,
   useReviewForm,
 } from '@/features/reviews/use-review-form';
+import { useWriteBlock } from '@/hooks/use-write-block';
+import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useCampusLoading, useRestrooms } from '@/stores/campus-store';
 
@@ -43,6 +46,7 @@ export default function WriteReviewScreen() {
   const requestWrite = useRequestWrite();
   const restrooms = useRestrooms();
   const campusLoading = useCampusLoading();
+  const blocked = useWriteBlock();
   const form = useReviewForm(restroomId, uid);
 
   const [busy, setBusy] = useState(false);
@@ -73,7 +77,11 @@ export default function WriteReviewScreen() {
       });
       router.back();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save your review.');
+      // NOT `e.message`. `firebase-errors.ts` opens by arguing against exactly
+      // that: Firestore's own strings are written for a developer reading a
+      // stack trace, and "Missing or insufficient permissions" tells a student
+      // nothing they can act on.
+      setError(firebaseErrorMessage(e, 'save'));
       setBusy(false);
       setProgress(null);
     }
@@ -85,8 +93,8 @@ export default function WriteReviewScreen() {
     try {
       await deleteReview(restroomId, uid, original);
       router.back();
-    } catch {
-      setError('Could not delete your review.');
+    } catch (e) {
+      setError(firebaseErrorMessage(e, 'delete'));
       setBusy(false);
     }
   }
@@ -136,7 +144,27 @@ export default function WriteReviewScreen() {
         </View>
       ) : null}
 
-      {canWrite && !form.loading ? (
+      {/*
+        ⚠️ **The form is NOT offered when the prefill failed.** Falling through
+        would present a blank create form to someone who already has a review
+        here, and posting it is denied every time — see the catch in
+        `use-review-form.ts` for why. A retry is the only honest control.
+      */}
+      {canWrite && form.failed ? (
+        <View className="gap-3">
+          <Callout tone="danger">
+            <Text type="body-sm">
+              Could not open your review. Posting now would replace something you
+              cannot see.
+            </Text>
+          </Callout>
+          <Button variant="secondary" size="lg" className="rounded-full" onPress={form.retry}>
+            <Button.Label>Try again</Button.Label>
+          </Button>
+        </View>
+      ) : null}
+
+      {canWrite && !form.loading && !form.failed ? (
         <>
           {/*
             Overall is the headline question and is drawn as one — larger stars,
@@ -175,7 +203,6 @@ export default function WriteReviewScreen() {
               {/* A rating-only review is fine — the rules permit empty text. */}
               Optional. {form.text.length} of {MAX_TEXT}.
             </TextFieldDescription>
-            {error ? <TextFieldError>{error}</TextFieldError> : null}
           </TextField>
 
           <PhotoPicker
@@ -185,14 +212,27 @@ export default function WriteReviewScreen() {
             pick={pickPhotos}
           />
 
-          <Button size="lg" className="rounded-full" onPress={onSave} isDisabled={!ready}>
+          <FormMessage blocked={blocked} error={error} />
+
+          <Button
+            size="lg"
+            className="rounded-full"
+            onPress={onSave}
+            isDisabled={!ready || blocked !== null}
+          >
             <Button.Label>
               {progress ?? (form.mode === 'edit' ? 'Save changes' : 'Post review')}
             </Button.Label>
           </Button>
 
           {form.mode === 'edit' ? (
-            <Button variant="danger-soft" size="lg" className="rounded-full" onPress={onDelete} isDisabled={busy}>
+            <Button
+              variant="danger-soft"
+              size="lg"
+              className="rounded-full"
+              onPress={onDelete}
+              isDisabled={busy || blocked !== null}
+            >
               <Button.Label>Delete review</Button.Label>
             </Button>
           ) : null}

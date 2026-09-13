@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { createReview, deleteReview, fetchMyReview, updateReview } from '@/features/reviews/api';
 import { MAX_PHOTOS, pickPhotos } from '@/features/restrooms/photos';
@@ -21,6 +21,13 @@ export type ComposerPhoto =
 export type ReviewFormState = {
   mode: 'create' | 'edit';
   loading: boolean;
+  /**
+   * The prefill read failed — which is NOT the same as "no review exists", and
+   * conflating the two is what this field was added to stop. See the hook.
+   */
+  failed: boolean;
+  /** Re-runs the prefill read. */
+  retry: () => void;
   rating: number;
   cleanliness: number;
   text: string;
@@ -51,7 +58,11 @@ export function useReviewForm(restroomId: string | undefined, uid: string | null
    * merely brief.
    */
   const key = restroomId && uid ? reviewId(restroomId, uid) : null;
-  const [loaded, setLoaded] = useState<{ key: string; review: Review | null } | null>(null);
+  const [loaded, setLoaded] = useState<
+    { key: string; review: Review | null; failed?: boolean } | null
+  >(null);
+  /** Monotonic re-read key, like `attempt` in campus-store. */
+  const [attempt, setAttempt] = useState(0);
   const [rating, setRating] = useState(0);
   const [cleanliness, setCleanliness] = useState(0);
   const [text, setText] = useState('');
@@ -71,22 +82,40 @@ export function useReviewForm(restroomId: string | undefined, uid: string | null
           setPhotos(review.photoIds.map((path) => ({ kind: 'existing', path })));
         }
       })
-      // A failed prefill is treated as "no existing review": the worst case is
-      // a create that the composite-id rule then rejects, which is recoverable,
-      // rather than a form the user can never open.
-      .catch(() => live && setLoaded({ key, review: null }));
+      /*
+        ⚠️ **A failed prefill used to resolve to `review: null`, which means
+        CREATE — and create is a trap here.**
+
+        This once read: "the worst case is a create that the composite-id rule
+        then rejects, which is recoverable". Both halves were wrong. The create
+        rule never runs: `createReview` is a `setDoc`, so over a review that
+        already exists Firestore evaluates the UPDATE rule, and that pins
+        `unchanged([... 'createdAt'])` while `setDoc` re-stamps
+        `createdAt: serverTimestamp()`. It is denied, identically, every time.
+
+        And nothing recovers. The user is shown a blank "Write a review" form,
+        retypes a review they already wrote, and can never post it — their own
+        text is never fetched and never shown. Nothing is destroyed; the screen
+        is simply a dead end, and the only way out is to leave and come back
+        with a working connection.
+      */
+      .catch(() => live && setLoaded({ key, review: null, failed: true }));
     return () => {
       live = false;
     };
-  }, [restroomId, uid, key]);
+  }, [restroomId, uid, key, attempt]);
 
   const entry = key && loaded?.key === key ? loaded : null;
+
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   return {
     mode: entry?.review ? 'edit' : 'create',
     // A guest has no key and nothing to wait for — the screen shows the join
     // gate, not a spinner.
     loading: key !== null && entry === null,
+    failed: entry?.failed === true,
+    retry,
     rating,
     cleanliness,
     text,

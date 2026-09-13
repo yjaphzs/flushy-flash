@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import { subscribeToBuildings } from '@/features/buildings/api';
 import { subscribeToRestrooms } from '@/features/restrooms/api';
-import { firestoreErrorMessage } from '@/lib/firestore-errors';
+import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useUid } from '@/stores/auth-store';
 import { useCampusStore } from '@/stores/campus-store';
 import { useConnectionStore } from '@/stores/connection-store';
@@ -66,7 +66,7 @@ export function useCampusData() {
     const fail = (e: unknown) => {
       if (!live) return;
       const { failures, retry } = useCampusStore.getState();
-      setError(firestoreErrorMessage(e));
+      setError(firebaseErrorMessage(e));
       const delay = Math.min(MAX_RETRY_MS, RETRY_MS * 2 ** Math.min(failures, 3));
       timer = setTimeout(() => {
         if (live) retry();

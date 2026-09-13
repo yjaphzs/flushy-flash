@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { useAppToast } from '@/components/feedback/toast';
 import { Chip } from '@/components/ui/chip';
 import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
@@ -8,6 +9,7 @@ import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { confirmationSummary, reportSummary } from '@/features/restrooms/confirmations';
 import { castVote, withdrawVote } from '@/features/restrooms/votes-api';
+import { useWriteBlock } from '@/hooks/use-write-block';
 import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useMyVote } from '@/stores/votes-store';
 import type { Restroom } from '@/lib/types';
@@ -43,6 +45,8 @@ export function TrustRow({ restroom }: TrustRowProps) {
   const canWrite = useCanWrite();
   const requestWrite = useRequestWrite();
   const myVote = useMyVote(restroom.id);
+  const blocked = useWriteBlock();
+  const toast = useAppToast();
   const [busy, setBusy] = useState(false);
   const reports = reportSummary(restroom.reportCount);
 
@@ -51,6 +55,13 @@ export function TrustRow({ restroom }: TrustRowProps) {
   function vote(kind: 'confirm' | 'report') {
     if (!canWrite || !uid) {
       requestWrite({ href: `/restroom/${restroom.id}`, reason: 'confirm' });
+      return;
+    }
+    // Same reasoning as the like button: these two buttons already use their
+    // variant to say which way you voted, so disabling them offline would make
+    // "you have not voted" and "you cannot vote" look the same.
+    if (blocked) {
+      toast.offline(blocked);
       return;
     }
     setBusy(true);

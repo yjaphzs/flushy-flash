@@ -1,7 +1,9 @@
 import { Button } from '@/components/ui/button';
+import { useAppToast } from '@/components/feedback/toast';
 import { Icon } from '@/components/ui/icon';
 import { likeRestroom, unlikeRestroom } from '@/features/likes/api';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
+import { useWriteBlock } from '@/hooks/use-write-block';
 import { useIsLiked } from '@/stores/likes-store';
 
 export type LikeButtonProps = {
@@ -42,10 +44,22 @@ export type LikeButtonProps = {
 export function LikeButton({ restroomId, uid, canWrite, href }: LikeButtonProps) {
   const requestWrite = useRequestWrite();
   const liked = useIsLiked(restroomId);
+  const blocked = useWriteBlock();
+  const toast = useAppToast();
 
   function onPress() {
     if (!canWrite || !uid) {
       requestWrite({ href, reason: 'like' });
+      return;
+    }
+    /*
+      A toast rather than a disabled button, unlike the Save buttons on the
+      forms. The heart carries state — filled or not — so greying it out would
+      overload the one signal it has, and there is nowhere beside it to put a
+      sentence. This is the case the toast wrapper exists for.
+    */
+    if (blocked) {
+      toast.offline(blocked);
       return;
     }
     const run = liked ? unlikeRestroom : likeRestroom;

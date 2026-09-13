@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { List } from '@/components/common/list';
 import { EmptyState } from '@/components/feedback/empty-state';
+import { useAppToast } from '@/components/feedback/toast';
 import { Screen } from '@/components/layouts/screen';
 import { useScreenTopClearance, useTabBarClearance } from '@/components/layouts/tab-bar-metrics';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,8 @@ import {
   NotificationRow,
 } from '@/features/notifications/components/notification-row';
 import { useCanWrite } from '@/stores/auth-store';
+import { useWriteBlock } from '@/hooks/use-write-block';
+import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useBuildings, useRestrooms } from '@/stores/campus-store';
 import { useIsOnline } from '@/stores/connection-store';
 import {
@@ -49,6 +52,8 @@ export default function NotificationsScreen() {
   const loading = useNotificationsLoading();
   const error = useNotificationsError();
   const online = useIsOnline();
+  const blocked = useWriteBlock();
+  const toast = useAppToast();
   const restrooms = useRestrooms();
   const buildings = useBuildings();
 
@@ -184,7 +189,21 @@ export default function NotificationsScreen() {
                 variant="secondary"
                 size="sm"
                 className="rounded-full"
-                onPress={() => void markAllRead(unreadIds).catch(() => {})}
+                /*
+                  ⚠️ This used to swallow every failure. `readAt` is the only
+                  field a client may write here, so the rows simply stayed bold
+                  with no explanation — indistinguishable from the button not
+                  being wired up at all.
+                */
+                onPress={() => {
+                  if (blocked) {
+                    toast.offline(blocked);
+                    return;
+                  }
+                  void markAllRead(unreadIds).catch((e) =>
+                    toast.error(firebaseErrorMessage(e, 'save')),
+                  );
+                }}
               >
                 <Button.Label>Mark all read</Button.Label>
               </Button>
