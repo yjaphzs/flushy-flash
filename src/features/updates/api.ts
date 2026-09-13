@@ -86,9 +86,18 @@ export function evaluate(
   };
 }
 
-/** `71234567` → `"68 MB"`. Shown BEFORE the download starts, never after. */
+/**
+ * `71234567` → `"68 MB"`.
+ *
+ * The KB branch is for the offline map pack, which is a few hundred kilobytes —
+ * without it `Math.round` turned every size under 1.5 MB into "1 MB", and a
+ * download that reports the same number throughout is worse than none. An APK
+ * never reaches it.
+ */
 export function formatBytes(bytes: number): string {
   if (bytes <= 0) return '';
-  const mb = bytes / (1024 * 1024);
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.max(1, Math.round(kb))} KB`;
+  const mb = kb / 1024;
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`;
 }
