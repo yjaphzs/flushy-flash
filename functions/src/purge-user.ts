@@ -105,6 +105,12 @@ export async function purgeUser(uid: string): Promise<PurgeResult> {
   await deleteWhere('likes', 'userId', uid);
   await deleteWhere('follows', 'followerId', uid);
   await deleteWhere('follows', 'followeeId', uid);
+  // The account's own inbox goes with it.
+  await deleteWhere('notifications', 'userId', uid);
+  // Notifications this account CAUSED stay, because they belong to the person
+  // who received them — but they must stop naming a deleted user, exactly as
+  // their reviews do. Only `review` notifications carry an actor at all.
+  await reassign('notifications', 'actorId', uid, anonId);
 
   // 6. Avatar objects, then the private subtree, then the profile.
   await deleteStoragePrefix(`users/${uid}/`);

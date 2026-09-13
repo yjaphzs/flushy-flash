@@ -247,8 +247,9 @@ CLSU's farmland).
 
 ## 7. Data model and security
 
-Collections: `buildings`, `restrooms`, `reviews`, `users` (+ `users/{uid}/private`),
-`handles`, `follows`, `likes`. Types in `src/lib/types.ts`.
+Collections: `buildings`, `restrooms`, `reviews`, `restroomVotes`, `users`
+(+ `users/{uid}/private`), `handles`, `follows`, `likes`, `notifications`, and
+the server-only `deletions` ledger. Types in `src/lib/types.ts`.
 
 **Public read, authenticated write.** `buildings`, `restrooms`, `reviews` and
 `users` are world-readable so a guest opens straight onto a working map.
@@ -256,14 +257,32 @@ Collections: `buildings`, `restrooms`, `reviews`, `users` (+ `users/{uid}/privat
 someone saved, are behavioural data with no public purpose. `users/{uid}/private`
 is where anything personal belongs, and stays self-only.
 
-**There is no `notifications` collection, and that is not an oversight.** A
-notification is written BY one user INTO another user's inbox; any rule
-permissive enough to let a client do that is a spam vector. The only honest
-writer is a Cloud Function with admin credentials, which needs Blaze. When that
-lands: `notifications/{id}` with `{ userId, kind, actorId, restroomId, reviewId,
-readAt, createdAt }`, `allow create: if false` (server-only), and the one client
-write being `affectedKeys().hasOnly(['readAt'])` to mark read. The tab ships as
-an empty state so the information architecture is settled meanwhile.
+**`notifications` is server-only, and `allow create` is `false` for EVERYONE —
+including the recipient.** A notification is written BY one party INTO another
+party's inbox; any rule permissive enough to let a client do that is a spam
+vector, and lets an attacker forge the actor on a message the recipient will
+trust. The only honest writer is a Cloud Function with admin credentials, which
+bypasses rules entirely. The one client write is `readAt`.
+
+⚠️ **This section used to say the feature was blocked on Blaze. It was already
+wrong** — `functions/` has been deployed since the trust system landed. The
+reasoning above survived; only the blocker was imaginary.
+
+Two things about the shape are load-bearing:
+
+- **Every id is DERIVED, never auto-generated** — `rev_{reviewId}`,
+  `con_{voteId}`, `ver_{restroomId}`, `hid_{restroomId}`. That is what lets
+  `notify()` in `functions/src/index.ts` RETHROW where every other trigger
+  swallows: a notification does not self-heal on the next write the way a
+  recomputed aggregate does, so it must be retried — and a retry is only safe
+  if it cannot duplicate.
+- ⚠️ **`actorId` is null on every kind but `review`, and that is a privacy
+  guarantee rather than a gap.** `restroomVotes` is owner-scoped precisely so
+  that who confirmed or reported an entry stays private; a `confirmed`
+  notification naming its voter would route straight around that read rule.
+  A `report` produces no notification at all — three of them produce `hidden`,
+  which is the honest signal. **Never add "someone saved your restroom"**:
+  `likes` is owner-scoped for the same reason.
 
 Invariants the rules enforce — **preserve these when editing `firestore.rules`**:
 
@@ -291,9 +310,10 @@ Invariants the rules enforce — **preserve these when editing `firestore.rules`
   count reads `photoIds.length` until a Cloud Function exists.
 - **Aggregates are never client-writable.** `ratingSum`, `ratingCount`,
   `photoCount` and the social counters reject client writes. Ratings are read live
-  via `getAggregateFromServer` (`src/features/restrooms/api.ts`), so no Cloud
-  Function and no Blaze plan is needed yet. The fields already exist, so adding a
-  Function later is additive — no migration, no rules change.
+  via `getAggregateFromServer` (`src/features/restrooms/api.ts`) wherever a live
+  read is cheap, and `onReviewWritten` now maintains `ratingSum`/`ratingCount` on
+  the document as well — which is what puts a rating on a map pin. That addition
+  needed no migration and no rules change, exactly as this note predicted.
 - **Reviews use a composite id** `${restroomId}_${uid}`. That is what makes "one
   review per user per restroom" unforgeable without a query or a race.
 - **The verified-student badge derives from the auth token's own claims**
@@ -672,6 +692,7 @@ Firestore and Realtime Database — nearest to Nueva Ecija, and **permanent**.
 | Realtime Database | asia-southeast1, rules deployed |
 | Storage | provisioned, rules deployed |
 | Auth | Email/Password **and Google** enabled |
+| Cloud Functions | **Blaze, deployed**, `asia-southeast1`, `maxInstances: 10`. Six triggers in `functions/` — account deletion, the rating aggregate, the trust tally, the pending-count, restroom cleanup, the hidden-restroom purge — plus the notification fan-out riding on three of them |
 
 Android app id `1:908364466191:android:56479030081484f70d3b7a`, package
 `xyz.yjaphzs.flushyflash`. Both the shared Expo debug keystore and the project's
@@ -826,13 +847,20 @@ The sheet shows only data that exists. The reference design's "Trust %" and
 drive/walk times were dropped on purpose — there is no source for either, and a
 heuristic rendered as a percentage reads as a measurement.
 
-Push notifications are **blocked on Blaze** — a client cannot write into another
-user's inbox without opening a spam vector, so the only honest sender is a Cloud
-Function (see §7).
+**The Alerts tab is a real inbox now.** `notifications` is written by the three
+existing triggers — a review on your restroom, a confirmation, and the `verified`
+/ `hidden` edges — read by `use-my-notifications.ts`, and counted by
+`useUnreadCount()` for a dot on the tab. See §7 for the privacy constraints,
+which are the whole design.
 
-Stubbed — safe places to pick up: the review composer
-(`src/app/(app)/review/[restroomId].tsx`) and notifications
-(`src/app/(app)/(tabs)/notifications.tsx`, blocked on Cloud Functions — see §7).
+**PUSH notifications remain unbuilt**, and that is now a plain scope decision
+rather than a platform one: `expo-notifications` is a native module, so it needs
+a config plugin, `POST_NOTIFICATIONS` on Android 13+, an APNs key, a device-token
+collection with its own rules and cleanup, and a full rebuild — it cannot ship
+through the APK self-updater in `src/features/updates/`.
+
+Stubbed — a safe place to pick up: the review composer
+(`src/app/(app)/review/[restroomId].tsx`).
 
 ## The trust system: who may add, and who decides what stays
 

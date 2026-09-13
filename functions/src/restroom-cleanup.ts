@@ -26,6 +26,9 @@ export async function cleanupRestroom(restroomId: string): Promise<void> {
   await deleteQuery(db.collection('reviews').where('restroomId', '==', restroomId));
   await deleteQuery(db.collection('restroomVotes').where('restroomId', '==', restroomId));
   await deleteQuery(db.collection('likes').where('restroomId', '==', restroomId));
+  // Without this an inbox keeps rows pointing at a restroom that is gone, and
+  // tapping one opens the detail page's "no longer listed" dead end.
+  await deleteQuery(db.collection('notifications').where('restroomId', '==', restroomId));
 
   // Last, and best-effort: bytes with no document pointing at them cost storage
   // and nothing else, whereas a document pointing at bytes that are gone renders

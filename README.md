@@ -59,6 +59,7 @@ work.
 | ⭐ | **Rate and review** — one review each, always yours to edit |
 | ✅ | **Confirm the real ones**, and report the ones that are not there |
 | 🔖 | **Save** the ones you rely on |
+| 🔔 | **Hear about your restrooms** — reviews, confirmations, and when one gets verified |
 | 🎓 | **CLSU student badge** once you confirm a campus email address |
 
 ---
@@ -270,8 +271,8 @@ restroom or review you contribute.
 
 Being honest about what is in the app and does nothing yet:
 
-- **The alerts tab is empty**, always. It is a placeholder so the layout is
-  settled; this version sends no notifications.
+- **Alerts live in the app only.** The bell tab fills up and the tab shows a dot,
+  but your phone stays silent — there are no push notifications in this version.
 - **You cannot edit a restroom after adding it** — not the directions, not the
   amenities, not whether it is out of order. Deleting it (while untouched) is the
   only correction available. This is the biggest gap.
@@ -630,6 +631,7 @@ Firestore collections, with types in `src/lib/types.ts`:
 | `users/{uid}/private` | self | self — anything personal lives here |
 | `handles` | public | claimed atomically with the profile |
 | `follows`, `likes` | owner / member | owner |
+| `notifications` | **owner only** | **nobody** — server-only; the one client write is `readAt` |
 
 `buildings`, `restrooms`, `reviews` and `users` are world-readable so a guest opens
 straight onto a working map.
@@ -658,12 +660,16 @@ restroom itself. There is no update path either: changing your mind is a delete
 then a create, so `byStudent` cannot be re-evaluated against a token that has
 since changed.
 
-There is **no `notifications` collection**, and that is not an oversight — a
-notification is written *by* one user *into* another user's inbox, and any rule
-permissive enough to allow that is a spam vector. The only honest writer is a
-Cloud Function with admin credentials; the document shape it would take is
-spelled out in [AGENTS.md §7](./AGENTS.md). The tab ships as an empty state
-meanwhile.
+`notifications` has `allow create: if false` **for everyone, including the
+recipient** — a notification is written *by* one party *into* another party's
+inbox, and any rule permissive enough to allow that is a spam vector that also
+lets an attacker forge the actor. The only writer is a Cloud Function with admin
+credentials, which bypasses rules entirely.
+
+⚠️ **`actorId` is null on every kind but `review`.** A `confirmed` notification
+never names its voter, because `restroomVotes` is owner-scoped precisely to keep
+that private; naming them would route around the read rule. A report produces no
+notification at all. Full reasoning in [AGENTS.md §7](./AGENTS.md).
 
 ---
 

@@ -6,6 +6,14 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { logger } from 'firebase-functions';
 
+import {
+  restroomOwner,
+  restroomTransitions,
+  reviewNotification,
+  voteNotification,
+  writeNotifications,
+  type NotificationItem,
+} from './notifications';
 import { purgeUser } from './purge-user';
 import { affectedRestrooms, recomputeRating } from './rating-aggregate';
 import { cleanupRestroom } from './restroom-cleanup';
@@ -59,6 +67,37 @@ export const deleteAccount = onCall(
 );
 
 /**
+ * ⚠️ The one place in this file that RETHROWS, and the reason it can.
+ *
+ * Every trigger below logs its failures and swallows them, because their work
+ * recomputes from scratch on the next write — that self-healing property is
+ * what makes a retry pointless. A notification has none of it: a dropped write
+ * is simply gone, and the author never learns their restroom was hidden.
+ *
+ * So this rethrows and lets the platform retry the event. That is only safe
+ * because every id is DERIVED rather than auto-generated, so the retry is a
+ * no-op rewrite rather than a duplicate — see `writeNotifications`. It also
+ * re-runs the aggregate work above, which is idempotent by design.
+ *
+ * Nulls are filtered here rather than at each call site so the decision
+ * functions can return `null` for "not news" and read as predicates.
+ */
+async function notify(items: (NotificationItem | null)[]): Promise<void> {
+  const real = items.filter((item): item is NotificationItem => item !== null);
+  if (real.length === 0) return;
+
+  try {
+    await writeNotifications(real);
+  } catch (e) {
+    logger.error('notify: write failed', {
+      ids: real.map((i) => i.id),
+      error: String(e),
+    });
+    throw e;
+  }
+}
+
+/**
  * Keeps `restrooms.ratingSum` / `ratingCount` in step with the reviews.
  *
  * These fields have existed since the schema was written and have been pinned
@@ -90,6 +129,18 @@ export const onReviewWritten = onDocumentWritten('reviews/{reviewId}', async (ev
       logger.error('onReviewWritten: recompute failed', { restroomId, error: String(e) });
     }
   }
+
+  // A review carries `restroomId` but not the restroom's author, so finding the
+  // recipient costs one read. Only on a create — `reviewNotification` returns
+  // null for an edit or a delete, so this is skipped for both.
+  if (before === undefined && after !== undefined) {
+    const restroomId = typeof after.restroomId === 'string' ? after.restroomId : null;
+    if (restroomId) {
+      await notify([
+        reviewNotification(before, after, event.params.reviewId, await restroomOwner(restroomId)),
+      ]);
+    }
+  }
 });
 
 /**
@@ -112,6 +163,15 @@ export const onVoteWritten = onDocumentWritten('restroomVotes/{voteId}', async (
     // nothing that self-healing does not already give.
     logger.error('onVoteWritten: recompute failed', { restroomId, error: String(e) });
   }
+
+  await notify([
+    voteNotification(
+      event.data?.before.data(),
+      event.data?.after.data(),
+      event.params.voteId,
+      await restroomOwner(restroomId),
+    ),
+  ]);
 });
 
 /**
@@ -142,6 +202,17 @@ export const onRestroomWritten = onDocumentWritten('restrooms/{restroomId}', asy
       logger.error('onRestroomWritten: pending recompute failed', { uid, error: String(e) });
     }
   }
+
+  // The author's own restroom crossing into verified or hidden. Both are EDGES
+  // — see restroomTransitions, which this trigger's every-write cadence makes
+  // load-bearing.
+  await notify(
+    restroomTransitions(
+      event.data?.before.data(),
+      event.data?.after.data(),
+      event.params.restroomId,
+    ),
+  );
 });
 
 /**

@@ -12,6 +12,7 @@ import {
   withTiming,
 } from '@/components/ui/motion';
 import { Pressable } from '@/components/ui/pressable';
+import { View } from '@/components/ui/view';
 
 export type TabBarItemProps = {
   icon: IconName;
@@ -20,6 +21,15 @@ export type TabBarItemProps = {
   onPress: () => void;
   /** Reports this item's horizontal centre, relative to the bar. */
   onMeasure: (centre: number) => void;
+  /**
+   * Unread count. 0 or undefined draws nothing.
+   *
+   * A NUMBER rather than a boolean because the accessibility label needs it —
+   * see the render. The dot itself is not numbered; a count inside an 8pt
+   * circle at the corner of a 44pt box is unreadable, and the screen behind it
+   * is one tap away.
+   */
+  badge?: number;
   height: number;
   size: number;
   iconSize: number;
@@ -41,6 +51,7 @@ export function TabBarItem({
   selected,
   onPress,
   onMeasure,
+  badge = 0,
   height,
   size,
   iconSize,
@@ -90,7 +101,9 @@ export function TabBarItem({
       onPressOut={() => setPressed(0)}
       accessibilityRole="tab"
       accessibilityState={{ selected }}
-      accessibilityLabel={label}
+      // The dot carries meaning that a screen reader cannot see, so it has to
+      // be said. Falls back to the plain label when there is nothing unread.
+      accessibilityLabel={badge > 0 ? `${label}, ${badge} unread` : label}
       testID={testID}
       className="flex-1 items-center justify-center"
       style={{ height }}
@@ -112,6 +125,27 @@ export function TabBarItem({
         <Animated.View style={restStyle}>
           <Icon name={icon} size={iconSize} color="muted" strokeWidth={2} />
         </Animated.View>
+
+        {/*
+          ⚠️ OUTSIDE both opacity-animated wrappers, and last so it paints on
+          top. Inside either one it would cross-fade along with the glyph and
+          vanish on the selected tab — which is the tab someone is most likely
+          to be looking at.
+
+          No ring. The pill is a GlassSurface, so there is no single colour to
+          ring it with — a token guessed here would be wrong in one scheme. It
+          is placed in the corner the 22pt glyph does not reach inside the 44pt
+          box instead, which needs no colour to work.
+
+          `danger` keeps its own hue rather than following the brand (§14):
+          status colour that matches the accent stops reading as status.
+        */}
+        {badge > 0 ? (
+          <View
+            className="absolute rounded-full bg-danger"
+            style={{ top: 2, right: 2, width: 9, height: 9 }}
+          />
+        ) : null}
       </Animated.View>
     </Pressable>
   );
