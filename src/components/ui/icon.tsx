@@ -19,7 +19,9 @@ import MapGlyph from 'lucide-react-native/icons/map';
 import LocateFixed from 'lucide-react-native/icons/locate-fixed';
 import MapPin from 'lucide-react-native/icons/map-pin';
 import Plus from 'lucide-react-native/icons/plus';
+import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import Settings from 'lucide-react-native/icons/settings';
+import GraduationCap from 'lucide-react-native/icons/graduation-cap';
 import ScrollText from 'lucide-react-native/icons/scroll-text';
 import ShowerHead from 'lucide-react-native/icons/shower-head';
 import Sparkles from 'lucide-react-native/icons/sparkles';
@@ -67,6 +69,8 @@ export type IconName =
   | 'locate-fixed'
   | 'user-round'
   | 'settings'
+  | 'refresh-cw'
+  | 'graduation-cap'
   | 'log-out'
   | 'sparkles'
   | 'star'
@@ -109,6 +113,8 @@ const GLYPHS: Record<IconName, Glyph> = {
   'locate-fixed': LocateFixed,
   'user-round': UserRound,
   settings: Settings,
+  'refresh-cw': RefreshCw,
+  'graduation-cap': GraduationCap,
   'log-out': LogOut,
   sparkles: Sparkles,
   star: Star,
