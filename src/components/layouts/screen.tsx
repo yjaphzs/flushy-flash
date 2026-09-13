@@ -4,7 +4,10 @@ import type { ViewProps } from '@/components/ui/view';
 import { View } from '@/components/ui/view';
 import type { ScrollViewProps } from '@/components/layouts/scroll-view';
 import { ScrollView } from '@/components/layouts/scroll-view';
-import { useScreenTopClearance } from '@/components/layouts/tab-bar-metrics';
+import {
+  useScreenBottomClearance,
+  useScreenTopClearance,
+} from '@/components/layouts/tab-bar-metrics';
 
 /**
  * Android's missing top inset.
@@ -23,7 +26,15 @@ function useAndroidTopPad(enabled: boolean): number {
   return enabled && Platform.OS === 'android' ? clearance : 0;
 }
 
-/** Full-bleed screen container — use for the map, which is not a ScrollView. */
+/**
+ * Full-bleed screen container — use for the map, which is not a ScrollView.
+ *
+ * ⚠️ Unlike `ScreenScrollView` this applies NO bottom clearance, deliberately.
+ * It is the full-bleed primitive: padding it would leave a band of background
+ * below the map tiles for the same reason `topInset` documents at the top. A
+ * screen that pairs `Screen` with a `List` puts the clearance on the list's
+ * `contentContainerStyle`, where it belongs — see `my-restrooms.tsx`.
+ */
 export function Screen({
   children,
   className,
@@ -85,6 +96,7 @@ export function ScreenScrollView({
   avoidsKeyboard = false,
   keyboardShouldPersistTaps = 'handled',
   topInset = true,
+  bottomInset = true,
   testID,
 }: {
   children: React.ReactNode;
@@ -102,9 +114,18 @@ export function ScreenScrollView({
   keyboardShouldPersistTaps?: 'always' | 'never' | 'handled';
   /** Opt out under a native header, which already supplies the offset. */
   topInset?: boolean;
+  /**
+   * Opt out when the content must run FLUSH to the window bottom — a sheet with
+   * its own rounded top that fills the rest of the screen, say. Such a screen
+   * still owes its last row the clearance; it just has to apply it itself,
+   * inside whatever runs to the edge. `AuthScreen` is the worked example.
+   */
+  bottomInset?: boolean;
   testID?: string;
 }) {
   const paddingTop = useAndroidTopPad(topInset);
+  const bottomClearance = useScreenBottomClearance();
+  const paddingBottom = bottomInset ? bottomClearance : 0;
 
   return (
     // No padding here — the backdrop is absolutely positioned against this box
@@ -119,8 +140,14 @@ export function ScreenScrollView({
           our paddingTop supersedes the `py-*` top half — deliberately, since the
           inset is strictly larger than the 12-24px those classes set — while a
           caller passing its own paddingTop still wins over both.
+
+          The same applies to paddingBottom, and it is why no screen should carry
+          a `pb-*` class any more: this number is strictly larger and would win
+          anyway, so the class would be a lie sitting in the markup. The one
+          caller that legitimately overrides is a TAB screen passing
+          `useTabBarClearance()`, which is larger again and still wins.
         */
-        contentContainerStyle={[{ paddingTop }, contentContainerStyle]}
+        contentContainerStyle={[{ paddingTop, paddingBottom }, contentContainerStyle]}
         /*
           ⚠️ `topInset={false}` has to switch this off too, or it only half
           works: it disabled the Android pad while this stayed 'automatic', so a

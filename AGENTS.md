@@ -114,13 +114,28 @@ in `src/app/_layout.tsx`: a rule with a carve-out is a rule people stop trusting
   full-bleed (the map). Never `SafeAreaView`, never a raw `useSafeAreaInsets()`
   outside `layouts/`.
 - **Bottom clearance has exactly one source: `components/layouts/tab-bar-metrics.ts`.**
-  The tab bar floats over the content, so nothing pads a tab screen automatically
-  any more. **Adding a tab screen means adding the inset** — `useTabBarClearance()`
-  as `Screen.style` / `ScreenScrollView.contentContainerStyle` bottom padding, or
-  inside a `List`'s `contentContainerStyle` so the last row stays reachable rather
-  than merely tight. This fails **silently**: content slides under the pill with
-  nothing for typecheck, lint or a test to catch. Never hard-code 64 or 12
-  anywhere else.
+  Two numbers come out of it, and which one a screen needs depends on whether the
+  floating tab bar is on screen:
+
+  | Screen | Clearance | Who applies it |
+  |---|---|---|
+  | A tab screen (bar visible) | `useTabBarClearance()` — inset + 88 | **The screen**, as `Screen.style` / `contentContainerStyle` / a `List`'s `contentContainerStyle` |
+  | Anything else | `useScreenBottomClearance()` — inset + 24 | **`ScreenScrollView`, automatically** |
+
+  ⚠️ **`ScreenScrollView` now pads its own bottom** (`bottomInset`, default
+  `true`), which is why no screen should carry a `pb-*` class any more: the
+  runtime value composes after the class and wins, so the class would be a lie
+  sitting in the markup. `Screen` deliberately does NOT — it is the full-bleed
+  primitive, and the map would get a band of background under the tiles.
+
+  **A screen pairing `Screen` with a `List` therefore still applies it by hand**,
+  on the list's `contentContainerStyle`, exactly as it already does the top.
+  `my-restrooms.tsx` and `review-list.tsx` are the two.
+
+  This fails **silently** in both directions — content slides under the pill, or
+  a button ends up under the navigation bar — with nothing for typecheck or lint
+  to catch. `tab-bar-metrics.test.ts` pins the arithmetic because of that. Never
+  hard-code 64, 24 or 12 anywhere else.
 - **Icons go through `@/components/ui/icon`**, which is Lucide imported ONE FILE
   AT A TIME (`lucide-react-native/icons/<name>`). The barrel is an ESLint error:
   Metro does not tree-shake, so one root import ships ~1,600 glyphs. Adding an

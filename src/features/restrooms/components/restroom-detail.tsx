@@ -142,6 +142,89 @@ export function AmenityGrid({ amenities }: { amenities: Amenities }) {
   );
 }
 
+/**
+ * `StatRow`'s compact twin: one line of ~24pt where the tiles cost ~86.
+ *
+ * The map sheet is a glance, and three stacked icon-over-value-over-caption
+ * tiles were the second-largest block in it. Same three facts, plus the rating
+ * the sheet previously spent a whole `ScoreBar` on.
+ *
+ * A missing part is dropped rather than rendered as an em dash, because "—
+ * away" reads as a measurement that failed. The rating is the exception: it
+ * keeps its dash, since a restroom with no reviews yet is worth saying out loud.
+ */
+export function StatLine({
+  distanceM,
+  updatedAt,
+  reviewCount,
+  rating,
+}: {
+  distanceM: number | null;
+  updatedAt: Restroom['updatedAt'];
+  reviewCount: number | null;
+  rating: number | null;
+}) {
+  // Joined as one run so a dropped part cannot leave a dangling separator.
+  const facts = [
+    distanceM === null ? null : `${formatDistance(distanceM)} away`,
+    relativeTime(updatedAt),
+  ].filter((part): part is string => part !== null);
+
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <Icon name="star" size={14} color={rating === null ? 'muted' : 'accent'} filled={rating !== null} />
+      <Text type="body-sm" weight="semibold">
+        {rating === null ? '—' : rating.toFixed(1)}
+      </Text>
+      {reviewCount !== null && reviewCount > 0 ? (
+        <Text type="body-sm" color="muted">{`(${reviewCount})`}</Text>
+      ) : null}
+      <Text type="body-sm" color="muted" numberOfLines={1} className="flex-1">
+        {` · ${facts.join(' · ')}`}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * `AmenityGrid`'s compact twin: glyphs alone, ~36pt against the grid's ~160.
+ *
+ * ⚠️ Dropping the labels drops the only thing a screen reader had, so each tile
+ * carries its own `accessibilityLabel` — and an unknown amenity says so rather
+ * than being announced as absent.
+ *
+ * Sighted users get less than the grid gives them: absent and unknown look
+ * IDENTICAL here, because there is nowhere to put the grid's cross-or-nothing
+ * at 36pt. That is the trade a preview makes, and it errs the safe way — an
+ * unchecked amenity is never drawn as a confirmed absence. The full page draws
+ * the grid, where the distinction survives.
+ */
+export function AmenityIcons({ amenities }: { amenities: Amenities }) {
+  return (
+    <View className="flex-row gap-2">
+      {AMENITIES.map(({ key, label, icon }) => {
+        const present = amenities[key] === true;
+        const unknown = amenities[key] === null;
+        return (
+          <View
+            key={key}
+            accessible
+            accessibilityLabel={
+              present ? label : unknown ? `${label}, not known` : `No ${label.toLowerCase()}`
+            }
+            className={`h-9 flex-1 items-center justify-center rounded-xl ${
+              present ? 'bg-accent-soft' : 'bg-surface-secondary'
+            }`}
+            style={{ borderCurve: 'continuous' }}
+          >
+            <Icon name={icon} size={18} color={present ? 'accent' : 'muted'} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 export function AccessChip({ genderedAs }: { genderedAs: GenderedAs | null }) {
   if (!genderedAs) return null;
   return (

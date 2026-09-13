@@ -1,4 +1,5 @@
 import { List } from '@/components/common/list';
+import { useScreenBottomClearance } from '@/components/layouts/tab-bar-metrics';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -12,8 +13,6 @@ export type ReviewListProps = ReviewsState & {
   header: React.ReactNode;
   /** The signed-in user, so their own review gets an edit affordance. */
   uid: string | null;
-  /** Bottom padding; this route has no tab bar, so usually just breathing room. */
-  bottomInset?: number;
 };
 
 /**
@@ -28,6 +27,14 @@ export type ReviewListProps = ReviewsState & {
  *
  * The photo strip inside that header is a HORIZONTAL list, and that nesting is
  * the supported case: different axis, and it is header chrome rather than a row.
+ *
+ * ## ⚠️ The gutter is on the ROWS, not on the content container
+ *
+ * `contentContainerStyle` wraps the header too, so a `paddingHorizontal`
+ * there would inset the header — and the header opens on a full-bleed photo
+ * hero that has to reach both edges. Padding the rows individually is what
+ * lets the header run edge to edge while the reviews stay in the same 20pt
+ * gutter as every FormScreen in the app.
  */
 export function ReviewList({
   reviews,
@@ -36,18 +43,26 @@ export function ReviewList({
   retry,
   header,
   uid,
-  bottomInset = 24,
 }: ReviewListProps) {
+  /*
+    This screen owns its own list rather than sitting in a ScreenScrollView,
+    so nothing pads it for us — see the Screen docblock. It used to be a
+    hardcoded 24, which on a three-button phone left the last review touching
+    the navigation bar.
+  */
+  const paddingBottom = useScreenBottomClearance();
+
   return (
     <List
       data={reviews}
       keyExtractor={(r) => r.id}
       estimatedItemSize={180}
-      contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: bottomInset }}
-      ListHeaderComponent={<View className="gap-4 pb-2">{header}</View>}
+      contentContainerStyle={{ gap: 12, paddingBottom }}
+      // The header owns its own spacing, including its top inset.
+      ListHeaderComponent={<View className="pb-2">{header}</View>}
       ListEmptyComponent={
         loading ? (
-          <View className="items-center py-10">
+          <View className="items-center px-5 py-10">
             <Spinner />
           </View>
         ) : error ? (
@@ -55,7 +70,7 @@ export function ReviewList({
             A real retry, not a message. An errored onSnapshot DETACHES
             permanently and never fires again, so there is nothing to wait for.
           */
-          <View className="items-center gap-3 py-10">
+          <View className="items-center gap-3 px-5 py-10">
             <Text type="body-sm" color="muted">
               Reviews could not be loaded.
             </Text>
@@ -64,14 +79,20 @@ export function ReviewList({
             </Button>
           </View>
         ) : (
-          <EmptyState
-            icon="star"
-            title="No reviews yet"
-            description="Be the first — a sentence about whether it was clean is genuinely useful."
-          />
+          <View className="px-5">
+            <EmptyState
+              icon="star"
+              title="No reviews yet"
+              description="Be the first — a sentence about whether it was clean is genuinely useful."
+            />
+          </View>
         )
       }
-      renderItem={({ item }) => <ReviewCard review={item} isMine={item.authorId === uid} />}
+      renderItem={({ item }) => (
+        <View className="px-5">
+          <ReviewCard review={item} isMine={item.authorId === uid} />
+        </View>
+      )}
     />
   );
 }

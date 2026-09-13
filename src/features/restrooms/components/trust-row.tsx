@@ -6,6 +6,7 @@ import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
+import { confirmationSummary, reportSummary } from '@/features/restrooms/confirmations';
 import { castVote, withdrawVote } from '@/features/restrooms/votes-api';
 import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useMyVote } from '@/stores/votes-store';
@@ -43,6 +44,7 @@ export function TrustRow({ restroom }: TrustRowProps) {
   const requestWrite = useRequestWrite();
   const myVote = useMyVote(restroom.id);
   const [busy, setBusy] = useState(false);
+  const reports = reportSummary(restroom.reportCount);
 
   const mine = uid !== null && restroom.createdBy === uid;
 
@@ -79,20 +81,21 @@ export function TrustRow({ restroom }: TrustRowProps) {
         {/*
           Rendered only once somebody has actually said something. `ScoreBar`
           establishes the rule: an empty scale reads as a score of zero rather
-          than as nobody having spoken.
+          than as nobody having spoken — so this drops the "nobody yet" branch
+          the shared helper offers, which the list row does want.
+
+          The wording itself is shared with `restroom-row.tsx`, and the helper's
+          docblock carries the reason it is a COUNT and never progress toward a
+          threshold.
         */}
         {restroom.confirmCount > 0 ? (
           <Text type="body-sm" color="muted">
-            {restroom.confirmCount === 1
-              ? '1 person found this'
-              : `${restroom.confirmCount} people found this`}
+            {confirmationSummary(restroom.confirmCount)}
           </Text>
         ) : null}
-        {restroom.reportCount > 0 ? (
+        {reports ? (
           <Text type="body-sm" className="text-danger">
-            {restroom.reportCount === 1
-              ? '1 report'
-              : `${restroom.reportCount} reports`}
+            {reports}
           </Text>
         ) : null}
       </View>

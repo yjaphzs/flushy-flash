@@ -8,7 +8,10 @@ import { useTabBarClearance } from '@/components/layouts/tab-bar-metrics';
 import { Spinner } from '@/components/ui/spinner';
 import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
-import { RestroomRow } from '@/features/restrooms/components/restroom-row';
+import {
+  RESTROOM_ROW_HEIGHT,
+  RestroomRow,
+} from '@/features/restrooms/components/restroom-row';
 import { useCanWrite } from '@/stores/auth-store';
 import { useBuildings, useRestrooms } from '@/stores/campus-store';
 import { useLikedIds, useLikesLoading } from '@/stores/likes-store';
@@ -90,8 +93,13 @@ export default function LikesScreen() {
       <List
         data={saved}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: clearance }}
-        estimatedItemSize={92}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          gap: 12,
+          paddingBottom: clearance,
+        }}
+        estimatedItemSize={RESTROOM_ROW_HEIGHT}
         renderItem={({ item }) => <RestroomRow restroom={item} buildings={buildings} />}
       />
     </Screen>

@@ -15,9 +15,12 @@ import {
   useMapStyle,
 } from '@/components/common/map';
 import { CentrePin } from '@/components/common/centre-pin';
-import { BackButton } from '@/components/layouts/back-button';
+import { FloatingBackButton } from '@/components/layouts/floating-back-button';
 import { Screen } from '@/components/layouts/screen';
-import { useBottomInset, useTopInset } from '@/components/layouts/tab-bar-metrics';
+import {
+  useScreenBottomClearance,
+  useScreenTopClearance,
+} from '@/components/layouts/tab-bar-metrics';
 import { Button } from '@/components/ui/button';
 import { Icon } from '@/components/ui/icon';
 import { Pressable } from '@/components/ui/pressable';
@@ -49,8 +52,10 @@ export default function PickLocationScreen() {
   const buildings = useBuildings();
   const mapStyle = useMapStyle();
   const camera = useRef<MapCameraRef>(null);
-  const topInset = useTopInset();
-  const bottomInset = useBottomInset();
+  // Both were hand-rolled here (`topInset + 12`, `bottomInset + 16`) before the
+  // clearance hooks existed. The gaps are the app's, not this screen's.
+  const topClearance = useScreenTopClearance();
+  const bottomClearance = useScreenBottomClearance();
 
   /**
    * Where the camera opens. Computed once — `initialViewState` is initial-only
@@ -145,18 +150,11 @@ export default function PickLocationScreen() {
       </View>
 
       {/*
-        Opaque-ish: a bare chevron over arbitrary map tiles is unreadable.
-
-        `edgeAligned={false}` because there is no content edge here — the
-        component's -ml-3 would drag the glyph off centre and squash the disc
-        into an ellipse. The box is sized explicitly to 48 so it matches the
-        locate button below rather than being 4pt smaller than its neighbour.
+        Shared with the restroom page's photo hero — both put a chevron over
+        arbitrary content that has no contrast we can verify. See its docblock
+        for why the disc exists and why `edgeAligned` matters.
       */}
-      <View className="absolute left-4" style={{ top: topInset + 12 }}>
-        <View className="h-12 w-12 items-center justify-center rounded-full bg-background/95 shadow-md">
-          <BackButton onPress={() => router.back()} color="foreground" edgeAligned={false} />
-        </View>
-      </View>
+      <FloatingBackButton onPress={() => router.back()} top={topClearance} />
 
       <Pressable
         onPress={() => void locate()}
@@ -178,7 +176,7 @@ export default function PickLocationScreen() {
       <View
         onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
         className="absolute bottom-0 left-0 right-0 gap-3 rounded-t-3xl border-t border-border bg-background px-5 pt-4 shadow-md"
-        style={{ paddingBottom: bottomInset + 16, borderCurve: 'continuous' }}
+        style={{ paddingBottom: bottomClearance, borderCurve: 'continuous' }}
       >
         <View className="gap-1">
           <Text type="body" weight="semibold" className={valid ? undefined : 'text-danger'}>

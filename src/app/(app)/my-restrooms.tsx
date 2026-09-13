@@ -5,12 +5,19 @@ import { BackButton } from '@/components/layouts/back-button';
 import { List } from '@/components/common/list';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { Screen } from '@/components/layouts/screen';
-import { useScreenTopClearance } from '@/components/layouts/tab-bar-metrics';
+import {
+  useScreenBottomClearance,
+  useScreenTopClearance,
+} from '@/components/layouts/tab-bar-metrics';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
-import { RestroomRow } from '@/features/restrooms/components/restroom-row';
+import { confirmationSummary } from '@/features/restrooms/confirmations';
+import {
+  RESTROOM_ROW_HEIGHT,
+  RestroomRow,
+} from '@/features/restrooms/components/restroom-row';
 import { PENDING_CAP } from '@/features/restrooms/pending-quota';
 import { useUid } from '@/stores/auth-store';
 import { useBuildings, useRestrooms } from '@/stores/campus-store';
@@ -37,11 +44,40 @@ import type { Restroom } from '@/lib/types';
  * a preference: an unverified restroom is the one holding a contribution slot,
  * so it is what someone who cannot add another has come here to see.
  */
+/**
+ * The contribution cap, as three pips rather than as arithmetic.
+ *
+ * ⚠️ The count has LEFT the heading text to make room for these — it used to
+ * read "WAITING TO BE CONFIRMED · 1 OF 3". So the pips carry the only copy of
+ * that number, and without an accessibilityLabel a screen reader would get the
+ * words and lose the quantity entirely. The row of dots is one accessible
+ * element, not three: "1 of 3 slots in use" is the fact, and three separate
+ * "filled dot" announcements are not.
+ */
+function SlotPips({ used }: { used: number }) {
+  return (
+    <View
+      className="flex-row items-center gap-1"
+      accessible
+      accessibilityLabel={`${used} of ${PENDING_CAP} slots in use`}
+    >
+      {Array.from({ length: PENDING_CAP }, (_, i) => (
+        <View
+          key={i}
+          className={`size-1.5 rounded-full ${i < used ? 'bg-accent' : 'bg-border'}`}
+        />
+      ))}
+    </View>
+  );
+}
+
 export default function MyRestroomsScreen() {
   const uid = useUid();
   const restrooms = useRestrooms();
   const buildings = useBuildings();
   const topInset = useScreenTopClearance();
+  // No tab bar on this route, and Screen pads nothing — the list owns it.
+  const paddingBottom = useScreenBottomClearance();
   const requestWrite = useRequestWrite();
 
   const { rows, pending } = useMemo(() => {
@@ -56,18 +92,17 @@ export default function MyRestroomsScreen() {
 
     // One flat list with section markers rather than two Lists: nesting
     // virtualised lists is the thing `list.tsx` exists to prevent.
-    const out: ({ kind: 'heading'; id: string; text: string } | {
-      kind: 'row';
-      id: string;
-      restroom: Restroom;
-      verified: boolean;
-    })[] = [];
+    const out: (
+      | { kind: 'heading'; id: string; text: string; slotsUsed?: number }
+      | { kind: 'row'; id: string; restroom: Restroom; verified: boolean }
+    )[] = [];
 
     if (waiting.length > 0) {
       out.push({
         kind: 'heading',
         id: 'h-waiting',
-        text: `Waiting to be confirmed · ${waiting.length} of ${PENDING_CAP}`,
+        text: 'Waiting to be confirmed',
+        slotsUsed: waiting.length,
       });
       for (const r of waiting) out.push({ kind: 'row', id: r.id, restroom: r, verified: false });
     }
@@ -125,19 +160,34 @@ export default function MyRestroomsScreen() {
       <List
         data={rows}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 32 }}
-        estimatedItemSize={92}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, gap: 12, paddingBottom }}
+        estimatedItemSize={RESTROOM_ROW_HEIGHT}
         ListHeaderComponent={<View className="gap-4 px-1 pb-2">{header}</View>}
         renderItem={({ item }) =>
           item.kind === 'heading' ? (
-            <Text type="body-xs" weight="semibold" color="muted" className="pt-2">
-              {item.text.toUpperCase()}
-            </Text>
+            <View className="flex-row items-center gap-2 pt-2">
+              <Text type="body-xs" weight="semibold" color="muted">
+                {item.text.toUpperCase()}
+              </Text>
+              {item.slotsUsed === undefined ? null : <SlotPips used={item.slotsUsed} />}
+            </View>
           ) : (
             <RestroomRow
               restroom={item.restroom}
               buildings={buildings}
               badge={item.verified ? { label: 'Verified', color: 'success' } : null}
+              /*
+                Only the waiting ones. On a verified restroom the badge already
+                says so, and "4 people found this" under it would be restating
+                the outcome as though it were still in progress.
+              */
+              footer={
+                item.verified ? null : (
+                  <Text type="body-xs" color="muted">
+                    {confirmationSummary(item.restroom.confirmCount)}
+                  </Text>
+                )
+              }
             />
           )
         }

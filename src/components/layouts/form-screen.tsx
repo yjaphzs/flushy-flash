@@ -59,7 +59,7 @@ export function FormScreen({
 }: FormScreenProps) {
   return (
     <ScreenScrollView
-      contentContainerClassName={contentContainerClassName ?? 'gap-6 px-5 pb-10'}
+      contentContainerClassName={contentContainerClassName ?? 'gap-6 px-5'}
       avoidsKeyboard={avoidsKeyboard}
       topInset={topInset}
       testID={testID}
