@@ -42,6 +42,9 @@ const TAB_ICONS: Record<string, IconName> = {
   profile: 'user-round',
 };
 
+/** Where the centre action sends you. Must match a key of TAB_ICONS. */
+const MAP_ROUTE = 'index';
+
 /** Diameter of the circular active highlight. */
 const HIGHLIGHT = 44;
 /** Side of the centre action's rounded square. */
@@ -125,6 +128,30 @@ export function FloatingTabBar({
     [actionPressed, reduced],
   );
 
+  /**
+   * The centre action, which goes to the MAP before it does anything else.
+   *
+   * ⚠️ Without the navigate, pressing this from another tab does the entire
+   * search off-screen. The map is `lazy: false` and never frozen, so the
+   * camera really does fly its 900ms animation while the user is looking at
+   * Profile — they arrive to find it already parked at the destination. And
+   * every piece of feedback (`SearchingDialog`, `NearestStatus`,
+   * `CampusStatus`) renders INSIDE the map screen, so a denied location
+   * permission produced nothing at all. `NearestStatus` even auto-dismisses
+   * after 2.6s, so a result could expire before it was ever visible.
+   *
+   * `map-status.tsx` says the centre action gets "one message, never a silent
+   * no-op". This is what makes that true from anywhere.
+   *
+   * The route name is hardcoded for the same reason the glyph map above is:
+   * this component knows this app's routes (AGENTS.md §8). It stays a no-op
+   * when the map is already focused, so pressing it there is unchanged.
+   */
+  const centrePress = useCallback(() => {
+    if (state.routes[state.index]?.name !== MAP_ROUTE) navigation.navigate(MAP_ROUTE);
+    onCentrePress();
+  }, [navigation, onCentrePress, state.index, state.routes]);
+
   const renderTab = (index: number) => {
     const route = state.routes[index];
     return (
@@ -198,7 +225,7 @@ export function FloatingTabBar({
       {state.routes.slice(0, split).map((_, index) => renderTab(index))}
 
       <Pressable
-        onPress={onCentrePress}
+        onPress={centrePress}
         onPressIn={() => setActionPressed(1)}
         onPressOut={() => setActionPressed(0)}
         accessibilityRole="button"

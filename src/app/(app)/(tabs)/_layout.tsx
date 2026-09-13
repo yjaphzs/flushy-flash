@@ -21,11 +21,15 @@ import { useFindNearest } from '@/hooks/use-find-nearest';
  * and the ESLint firewall is untouched. Import via `expo-router/js-tabs`; bare
  * expo-router's `Tabs` is marked @deprecated.
  *
- * Two screenOptions are not optional, because the JS navigator's defaults differ
- * from NativeTabs':
- *   - headerShown defaults to TRUE, so every tab would grow a JS header.
- *   - lazy defaults to TRUE, so the map would stay unmounted until visited and
- *     a camera command from another tab would fly into a null ref.
+ * Two defaults have to be overridden, because the JS navigator's differ from
+ * NativeTabs' — note they are set in DIFFERENT places, which the previous
+ * version of this comment got wrong by calling both screenOptions:
+ *   - `headerShown` defaults to TRUE, so every tab would grow a JS header.
+ *     Set once in `screenOptions`, since it applies to all four.
+ *   - `lazy` defaults to TRUE, so the map would stay unmounted until visited
+ *     and a camera command from another tab would fly into a null ref. Set
+ *     per-screen on `index` ALONE, because only the map is commanded from
+ *     elsewhere; eagerly mounting the other three would buy nothing.
  *
  * Screen order is declared, not inferred: FloatingTabBar splits the pill at the
  * midpoint of state.routes, so the order IS the layout.
