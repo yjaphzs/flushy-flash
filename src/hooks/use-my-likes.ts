@@ -15,6 +15,10 @@ import { useLikesStore } from '@/stores/likes-store';
  */
 export function useMyLikes() {
   const uid = useUid();
+  // Re-subscribes when the screen's error branch calls retry(): an errored
+  // onSnapshot has already detached, so a fresh subscription is the only
+  // recovery. See the store.
+  const attempt = useLikesStore((s) => s.attempt);
 
   useEffect(() => {
     const { setLiked, setError, reset } = useLikesStore.getState();
@@ -31,5 +35,5 @@ export function useMyLikes() {
     );
 
     return unsubscribe;
-  }, [uid]);
+  }, [uid, attempt]);
 }

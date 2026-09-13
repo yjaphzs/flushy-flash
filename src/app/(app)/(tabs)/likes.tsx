@@ -4,8 +4,9 @@ import { EmptyState } from '@/components/feedback/empty-state';
 import { List } from '@/components/common/list';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/layouts/screen';
-import { useTabBarClearance } from '@/components/layouts/tab-bar-metrics';
+import { useScreenTopClearance, useTabBarClearance } from '@/components/layouts/tab-bar-metrics';
 import { Spinner } from '@/components/ui/spinner';
+import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import {
@@ -17,9 +18,19 @@ import { useBuildings, useRestrooms } from '@/stores/campus-store';
 import { useIsOnline } from '@/stores/connection-store';
 import { useLikedIds, useLikesLoading } from '@/stores/likes-store';
 
+/**
+ * The restrooms you saved.
+ *
+ * Structurally the twin of `my-restrooms.tsx` — same `List`, same padding, same
+ * row, same `estimatedItemSize`. It had no header of any kind, so the list
+ * started at the top of the screen with nothing naming it, and the tab bar's
+ * `title` is only an accessibility label. Profile already calls this number
+ * "Saved" and routes here; now the screen agrees.
+ */
 export default function LikesScreen() {
   // Every branch below needs it, and hooks cannot be called inside one.
   const clearance = useTabBarClearance();
+  const topInset = useScreenTopClearance();
   const canWrite = useCanWrite();
   const requestWrite = useRequestWrite();
   const likedIds = useLikedIds();
@@ -28,16 +39,18 @@ export default function LikesScreen() {
   const restrooms = useRestrooms();
   const buildings = useBuildings();
 
-  // Joined in memory rather than denormalised onto the like document: the whole
-  // campus is already in the store (AGENTS.md §6), so this costs nothing and
-  // avoids a staleness class.
-  // Joined in memory rather than denormalised onto the like document: the whole
-  // campus is already in the store (AGENTS.md §6), so this costs nothing and
-  // avoids a staleness class.
-  //
-  // The place name used to be derived here too. `RestroomRow` owns that now, so
-  // the Likes tab and "Your restrooms" cannot disagree about what a restroom is
-  // called — which they already had, before the row was shared.
+  /**
+   * Joined in memory rather than denormalised onto the like document: the whole
+   * campus is already in the store (AGENTS.md §6), so this costs nothing and
+   * avoids a staleness class.
+   *
+   * The place name used to be derived here too. `RestroomRow` owns that now, so
+   * the Likes tab and "Your restrooms" cannot disagree about what a restroom is
+   * called — which they already had, before the row was shared.
+   *
+   * The order is the listener's: `likes` is queried `orderBy createdAt desc`,
+   * so this is newest-saved-first and nothing re-sorts it.
+   */
   const saved = useMemo(() => {
     const byId = Object.fromEntries(restrooms.map((r) => [r.id, r]));
     return likedIds.map((id) => byId[id]).filter((r) => r !== undefined);
@@ -109,7 +122,9 @@ export default function LikesScreen() {
   }
 
   return (
-    <Screen>
+    // `topInset={false}` because the header inside the list carries it, the
+    // same inversion my-restrooms uses.
+    <Screen topInset={false}>
       <List
         data={saved}
         keyExtractor={(item) => item.id}
@@ -120,7 +135,24 @@ export default function LikesScreen() {
           paddingBottom: clearance,
         }}
         estimatedItemSize={RESTROOM_ROW_HEIGHT}
+        ListHeaderComponent={
+          <View className="gap-1 pb-2" style={{ paddingTop: topInset }}>
+            <Text type="h2" weight="bold" accessibilityRole="header">
+              Saved
+            </Text>
+            {/*
+              The ordering, said out loud. It has always been newest-first and
+              the screen never mentioned it, which makes a list that reshuffles
+              itself when you save something look arbitrary.
+            */}
+            <Text type="body-sm" color="muted">
+              {saved.length === 1 ? '1 restroom' : `${saved.length} restrooms`}, most recently
+              saved first.
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => <RestroomRow restroom={item} buildings={buildings} />}
+        testID="likes"
       />
     </Screen>
   );

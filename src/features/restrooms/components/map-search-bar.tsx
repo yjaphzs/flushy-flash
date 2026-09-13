@@ -46,11 +46,17 @@ export function MapSearchBar({
         accessibilityRole="button"
         // The dot alone says nothing to a screen reader, so the count is spoken.
         accessibilityLabel={active > 0 ? `Filters, ${active} active` : 'Filters'}
-        className="items-center justify-center rounded-full bg-background shadow-md"
+        className="items-center justify-center rounded-full bg-accent shadow-md"
         style={{ width: DISC, height: DISC }}
         testID="map-filter-button"
       >
-        <Icon name="filter" size={20} color={active > 0 ? 'accent' : 'foreground'} />
+        {/*
+          `on-accent` is the token for a glyph this app paints on an accent fill
+          it drew itself. White measures 4.65:1 on the darkened accent (§14), so
+          a label would be fine here too — it is a glyph only because the sheet
+          it opens is what explains it.
+        */}
+        <Icon name="filter" size={20} color="on-accent" />
         {/*
           A dot, not a number. A legible numeral needs a ~16pt badge on a 48pt
           disc, which crowds the glyph it is meant to annotate — and the count
@@ -59,8 +65,12 @@ export function MapSearchBar({
           `text-[7px]` numeral, which rendered as an illegible smudge AND relied
           on an arbitrary-value class uniwind can fail to compile with no error.
         */}
+        {/*
+          White, not accent: the button is now an accent fill, so an accent dot
+          on it would be invisible. Same token as the glyph above.
+        */}
         {active > 0 ? (
-          <View className="absolute right-3 top-3 size-2.5 rounded-full bg-accent" />
+          <View className="absolute right-3 top-3 size-2.5 rounded-full bg-on-accent" />
         ) : null}
       </Pressable>
 
@@ -71,12 +81,26 @@ export function MapSearchBar({
         Surface, and a null background because heroui's glass layer is opaque on
         Android).
       */}
-      <View className="flex-1 overflow-hidden rounded-full bg-background shadow-md">
+      {/*
+        ⚠️ No `overflow-hidden`. It clipped the focus ring: Android draws focus
+        as a `border-accent` on the input at `--field-radius` (12px), and a
+        pill-shaped parent with overflow hidden cut its corners off, which read
+        as a glow breaking at the ends. The input carries `rounded-full` below
+        so the ring follows the pill instead of fighting it.
+      */}
+      <View className="flex-1 rounded-full bg-background shadow-md">
         <Field.Input
           value={query}
           onChangeText={onQueryChange}
           placeholder="Search restrooms"
           leading="search"
+          /*
+            Transparent, not white: `--color-field` is a 14%-alpha wash, so over
+            the white pill above it renders as the grey this used to be. Letting
+            the pill show through is what makes it white. `rounded-full` matches
+            the parent so the focus ring is a pill too.
+          */
+          className="rounded-full bg-transparent"
           returnKeyType="search"
           onSubmitEditing={onSubmit}
           autoCapitalize="none"
