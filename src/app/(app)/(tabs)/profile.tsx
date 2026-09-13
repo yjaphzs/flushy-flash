@@ -88,6 +88,12 @@ export default function ProfileScreen() {
               onPress={() => requestWrite({ href: '/submit', reason: 'add' })}
             />
             <ActionRow
+              icon="map-pin"
+              label="Your restrooms"
+              hint="The ones you added, and whether they are confirmed"
+              onPress={() => router.push('/my-restrooms')}
+            />
+            <ActionRow
               icon="heart"
               label="Saved restrooms"
               hint="The ones you starred"

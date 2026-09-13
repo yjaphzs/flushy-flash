@@ -1,16 +1,14 @@
 import { useMemo } from 'react';
-import { router } from 'expo-router';
 
 import { EmptyState } from '@/components/feedback/empty-state';
 import { List } from '@/components/common/list';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Pressable } from '@/components/ui/pressable';
 import { Screen } from '@/components/layouts/screen';
 import { useTabBarClearance } from '@/components/layouts/tab-bar-metrics';
 import { Spinner } from '@/components/ui/spinner';
 import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
+import { RestroomRow } from '@/features/restrooms/components/restroom-row';
 import { useCanWrite } from '@/stores/auth-store';
 import { useBuildings, useRestrooms } from '@/stores/campus-store';
 import { useLikedIds, useLikesLoading } from '@/stores/likes-store';
@@ -28,22 +26,17 @@ export default function LikesScreen() {
   // Joined in memory rather than denormalised onto the like document: the whole
   // campus is already in the store (AGENTS.md §6), so this costs nothing and
   // avoids a staleness class.
+  // Joined in memory rather than denormalised onto the like document: the whole
+  // campus is already in the store (AGENTS.md §6), so this costs nothing and
+  // avoids a staleness class.
+  //
+  // The place name used to be derived here too. `RestroomRow` owns that now, so
+  // the Likes tab and "Your restrooms" cannot disagree about what a restroom is
+  // called — which they already had, before the row was shared.
   const saved = useMemo(() => {
     const byId = Object.fromEntries(restrooms.map((r) => [r.id, r]));
-    const buildingName = Object.fromEntries(buildings.map((b) => [b.id, b.name]));
-    return likedIds
-      .map((id) => byId[id])
-      .filter((r) => r !== undefined)
-      // The landmark the submitter wrote comes first: it is the thing they chose
-      // as recognisable. The building name is the fallback, and buildingId is
-      // nullable now — a pin beside the lagoon belongs to no building at all.
-      .map((r) => ({
-        ...r,
-        placeName:
-          r.landmark ||
-          (r.buildingId ? (buildingName[r.buildingId] ?? 'Unknown building') : 'On campus'),
-      }));
-  }, [likedIds, restrooms, buildings]);
+    return likedIds.map((id) => byId[id]).filter((r) => r !== undefined);
+  }, [likedIds, restrooms]);
 
   if (!canWrite) {
     return (
@@ -99,19 +92,7 @@ export default function LikesScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: clearance }}
         estimatedItemSize={92}
-        renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/restroom/${item.id}`)}>
-            <Card>
-              <Card.Body>
-                <Card.Title>{item.placeName}</Card.Title>
-                <Card.Description>
-                  Floor {item.floor}
-                  {item.locationNote ? ` · ${item.locationNote}` : ''}
-                </Card.Description>
-              </Card.Body>
-            </Card>
-          </Pressable>
-        )}
+        renderItem={({ item }) => <RestroomRow restroom={item} buildings={buildings} />}
       />
     </Screen>
   );
