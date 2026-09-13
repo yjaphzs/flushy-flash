@@ -76,6 +76,10 @@ function restroomDoc(overrides: Record<string, unknown> = {}) {
     ratingCount: 0,
     photoCount: 0,
     verified: false,
+    confirmCount: 0,
+    reportCount: 0,
+    trustScore: 0,
+    hiddenAt: null,
     createdBy: ALICE,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -107,10 +111,27 @@ function profileDoc(overrides: Record<string, unknown> = {}) {
     reviewCount: 0,
     followerCount: 0,
     followingCount: 0,
+    pendingRestroomCount: 0,
     createdAt: serverTimestamp(),
     ...overrides,
   };
 }
+
+/** A vote at the composite id the rules require. */
+function voteDoc(overrides: Record<string, unknown> = {}) {
+  return {
+    restroomId: RESTROOM_ID,
+    voterId: BOB,
+    kind: 'confirm',
+    byStudent: false,
+    byAdmin: false,
+    createdAt: serverTimestamp(),
+    ...overrides,
+  };
+}
+
+/** The id the rules force a vote to live at. */
+const voteId = (restroomId: string, uid: string) => restroomId + "_" + uid;
 
 beforeAll(async () => {
   testEnv = await initializeTestEnvironment({
@@ -385,9 +406,52 @@ describe('restrooms', () => {
     await assertFails(updateDoc(doc(db, 'restrooms', RESTROOM_ID), { verified: true }));
   });
 
-  it('allows a verified CLSU student to mark a restroom verified', async () => {
+  /**
+   * ⚠ This assertion is INVERTED from the one it replaces.
+   *
+   * It read `assertSucceeds`: any verified CLSU student could mark ANY
+   * restroom verified, not just their own. Nothing in the app ever called it,
+   * so the affordance only ever existed as a way to launder a fake onto the
+   * map. `verified` is now the OUTPUT of counting restroomVotes, written by a
+   * Cloud Function, which bypasses these rules entirely.
+   */
+  it('denies even a verified CLSU student marking a restroom verified', async () => {
     const db = testEnv.authenticatedContext(BOB, clsuStudent).firestore();
-    await assertSucceeds(updateDoc(doc(db, 'restrooms', RESTROOM_ID), { verified: true }));
+    await assertFails(updateDoc(doc(db, 'restrooms', RESTROOM_ID), { verified: true }));
+  });
+
+  it('denies a non-author student editing another person\'s restroom', async () => {
+    const db = testEnv.authenticatedContext(BOB, clsuStudent).firestore();
+    await assertFails(
+      updateDoc(doc(db, 'restrooms', RESTROOM_ID), { landmark: 'Somewhere else' }),
+    );
+  });
+
+  it('still allows the author to edit their own restroom', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'restrooms', RESTROOM_ID), { landmark: 'CLSU Lagoon, east side' }),
+    );
+  });
+
+  it('denies a client writing any of the four vote aggregates', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    for (const field of ['confirmCount', 'reportCount', 'trustScore']) {
+      await assertFails(updateDoc(doc(db, 'restrooms', RESTROOM_ID), { [field]: 5 }));
+    }
+    await assertFails(
+      updateDoc(doc(db, 'restrooms', RESTROOM_ID), { hiddenAt: serverTimestamp() }),
+    );
+  });
+
+  it('denies seeding the aggregates at create', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restrooms', 'restroom-seeded'), restroomDoc({ trustScore: 9 })),
+    );
+    await assertFails(
+      setDoc(doc(db, 'restrooms', 'restroom-seeded2'), restroomDoc({ verified: true })),
+    );
   });
 
   it('allows a restroom with no building — a pin beside the lagoon', async () => {
@@ -462,6 +526,252 @@ describe('restrooms', () => {
     });
     const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
     await assertFails(deleteDoc(doc(db, 'restrooms', RESTROOM_ID)));
+  });
+
+  it('allows the author to delete an entry nobody has invested in', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'restrooms', RESTROOM_ID)));
+  });
+
+  it('denies deleting once somebody else has vouched for it', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'restrooms', RESTROOM_ID), { confirmCount: 1 });
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(deleteDoc(doc(db, 'restrooms', RESTROOM_ID)));
+  });
+
+  it('denies a stranger deleting a restroom they did not add', async () => {
+    const db = testEnv.authenticatedContext(BOB, clsuStudent).firestore();
+    await assertFails(deleteDoc(doc(db, 'restrooms', RESTROOM_ID)));
+  });
+
+  // The contribution cap. These assert the RULE reads the counter; keeping
+  // the counter right is the Cloud Function\'s job, covered in trust.test.ts.
+  it('denies a create once the author is at the pending cap', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'users', ALICE), { pendingRestroomCount: 3 });
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(setDoc(doc(db, 'restrooms', 'restroom-capped'), restroomDoc()));
+  });
+
+  it('allows a create once a slot frees up', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'users', ALICE), { pendingRestroomCount: 2 });
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(setDoc(doc(db, 'restrooms', 'restroom-freed'), restroomDoc()));
+  });
+
+  /**
+   * Why the rule uses `.get('pendingRestroomCount', 0)` and not the field
+   * directly: every profile written before the trust system lacks it, and
+   * reading an absent key is an EVALUATION ERROR in rules rather than zero.
+   * Without the default this would deny every create by every existing user.
+   */
+  it('allows a create when the profile predates the counter', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const legacy: Record<string, unknown> = profileDoc();
+      delete legacy.pendingRestroomCount;
+      await setDoc(doc(ctx.firestore(), 'users', ALICE), {
+        ...legacy,
+        createdAt: new Date(),
+      });
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(setDoc(doc(db, 'restrooms', 'restroom-legacy'), restroomDoc()));
+  });
+
+  it('denies a client lowering its own pending count to dodge the cap', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'users', ALICE), { pendingRestroomCount: 3 });
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'users', ALICE), { pendingRestroomCount: 0 }));
+  });
+});
+
+/**
+ * Restroom votes: the community deciding whether an entry is real.
+ *
+ * The threat this collection exists under is different from reviews. A review
+ * is an opinion and is public; a vote is evidence, it decides whether someone
+ * else's contribution survives, and who cast it must not be public on a campus
+ * where a handle identifies a person.
+ */
+describe('restroom votes', () => {
+  const bobVote = voteId(RESTROOM_ID, BOB);
+
+  it('allows a signed-in user to confirm a restroom they did not add', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertSucceeds(setDoc(doc(db, 'restroomVotes', bobVote), voteDoc()));
+  });
+
+  it('allows a report', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'restroomVotes', bobVote), voteDoc({ kind: 'report' })),
+    );
+  });
+
+  it('denies an author vouching for their own restroom', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', voteId(RESTROOM_ID, ALICE)), 
+        voteDoc({ voterId: ALICE, byStudent: true }),
+      ),
+    );
+  });
+
+  /**
+   * The whole point of forcing byStudent against the TOKEN.
+   *
+   * Without it any throwaway Google account could claim student weight, and two
+   * of them would verify a fake onto the map. Same trick users.verifiedStudent
+   * already uses.
+   */
+  it('denies an outsider claiming student weight', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', bobVote), voteDoc({ byStudent: true })),
+    );
+  });
+
+  it('denies an unconfirmed CLSU address claiming student weight', async () => {
+    const db = testEnv.authenticatedContext(BOB, unverifiedStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', bobVote), voteDoc({ byStudent: true })),
+    );
+  });
+
+  it('requires a verified student to DECLARE the weight they have', async () => {
+    const db = testEnv.authenticatedContext(BOB, clsuStudent).firestore();
+    // byStudent must equal isVerifiedStudent(), in both directions - a student
+    // understating themselves is just as rejected, so the flag can never drift
+    // from the token.
+    await assertFails(setDoc(doc(db, 'restroomVotes', bobVote), voteDoc()));
+    await assertSucceeds(
+      setDoc(doc(db, 'restroomVotes', bobVote), voteDoc({ byStudent: true })),
+    );
+  });
+
+  it('denies claiming admin weight', async () => {
+    const db = testEnv.authenticatedContext(BOB, clsuStudent).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', bobVote), voteDoc({ byStudent: true, byAdmin: true })),
+    );
+  });
+
+  it('denies voting under somebody else\'s id', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', voteId(RESTROOM_ID, ALICE)), voteDoc({ voterId: ALICE })),
+    );
+  });
+
+  // The composite id is what makes one-vote-per-user structural. A vote parked
+  // at a free-form id would let one account vote as many times as it liked.
+  it('denies a vote at an id that does not match restroomId_uid', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(setDoc(doc(db, 'restroomVotes', 'anything-at-all'), voteDoc()));
+  });
+
+  it('denies voting on a restroom that does not exist', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', voteId('ghost', BOB)), voteDoc({ restroomId: 'ghost' })),
+    );
+  });
+
+  it('denies an invalid kind', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', bobVote), voteDoc({ kind: 'downvote' })),
+    );
+  });
+
+  it('denies an extra field', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(
+      setDoc(doc(db, 'restroomVotes', bobVote), voteDoc({ weight: 99 })),
+    );
+  });
+
+  // No update path at all, exactly like likes: changing your mind is a delete
+  // and then a create. An editable vote would let byStudent be re-evaluated
+  // against a token that has since changed.
+  it('never allows an update - changing your mind is delete then create', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restroomVotes', bobVote), {
+        ...voteDoc(),
+        createdAt: new Date(),
+      });
+    });
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(updateDoc(doc(db, 'restroomVotes', bobVote), { kind: 'report' }));
+  });
+
+  it('allows a voter to withdraw their own vote', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restroomVotes', bobVote), {
+        ...voteDoc(),
+        createdAt: new Date(),
+      });
+    });
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'restroomVotes', bobVote)));
+  });
+
+  it('denies withdrawing somebody else\'s vote', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restroomVotes', bobVote), {
+        ...voteDoc(),
+        createdAt: new Date(),
+      });
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(deleteDoc(doc(db, 'restroomVotes', bobVote)));
+  });
+
+  /**
+   * Owner-scoped reads, unlike every other public collection here.
+   *
+   * Learning who reported your restroom as fake is the beginning of retaliation,
+   * and a handle on this campus is a name. Only the aggregate is public, and it
+   * lives on the restroom.
+   */
+  it('denies reading another person\'s vote', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restroomVotes', bobVote), {
+        ...voteDoc(),
+        createdAt: new Date(),
+      });
+    });
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(getDoc(doc(db, 'restroomVotes', bobVote)));
+  });
+
+  it('denies a guest reading votes at all', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restroomVotes', bobVote), {
+        ...voteDoc(),
+        createdAt: new Date(),
+      });
+    });
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'restroomVotes', bobVote)));
+  });
+
+  it('allows a voter to read their own vote', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'restroomVotes', bobVote), {
+        ...voteDoc(),
+        createdAt: new Date(),
+      });
+    });
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertSucceeds(getDoc(doc(db, 'restroomVotes', bobVote)));
   });
 });
 

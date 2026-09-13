@@ -73,8 +73,40 @@ export type Restroom = {
   ratingSum: number;
   ratingCount: number;
   photoCount: number;
-  /** Set true only by a verified student or admin. */
+  /**
+   * Promoted by the community, never by a client.
+   *
+   * ⚠️ **Server-only now.** It used to be settable by any verified student —
+   * on any restroom, not just their own — and nothing ever set it. It is now
+   * the OUTPUT of counting `restroomVotes`: `trustScore >= 2`, written by
+   * `onVoteWritten`, and pinned against every client write in the rules.
+   */
   verified: boolean;
+  /** Distinct users who said they found it. Aggregate: server-written. */
+  confirmCount: number;
+  /** Distinct users who said it is not there. Aggregate: server-written. */
+  reportCount: number;
+  /**
+   * Weighted confirmations: `2 × admin + 1 × verified student`.
+   *
+   * The weighting is what lets one admin verify a restroom alone while two
+   * students are needed otherwise — which is the only reason the map can be
+   * bootstrapped at all before anyone has confirmed a @clsu.edu.ph address.
+   * A confirmation from an ordinary signed-in account is recorded and shown
+   * but scores zero, because three throwaway Google accounts must not be
+   * able to verify a fake.
+   */
+  trustScore: number;
+  /**
+   * When the community reported it into hiding, or null.
+   *
+   * ⚠️ Deliberately NOT a fourth value on `status`. That field is the
+   * restroom's real-world condition — `nearest.ts` filters on it and
+   * `StatusChip` renders it — and whether a toilet works is orthogonal to
+   * whether anyone believes it exists. A scheduled function deletes the
+   * document seven days after this is set.
+   */
+  hiddenAt: Timestamp | null;
   createdBy: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -131,6 +163,16 @@ export type UserProfile = {
   reviewCount: number;
   followerCount: number;
   followingCount: number;
+  /**
+   * Restrooms this account has added that the community has not verified.
+   *
+   * The contribution cap reads this: at `pendingCap()` (3) the rules refuse
+   * another create. Verified restrooms do not count, so the slot comes back
+   * when the community vouches for one. Server-written, like the counters
+   * above, and absent from every profile written before it existed — which is
+   * why both the rules and the client default it rather than reading it.
+   */
+  pendingRestroomCount: number;
   /** Set only on a tombstone, by the account-deletion function. */
   deleted?: boolean;
   createdAt: Timestamp;

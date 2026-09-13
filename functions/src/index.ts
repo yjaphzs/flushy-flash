@@ -1,11 +1,15 @@
 import { initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import { onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import { logger } from 'firebase-functions';
 
 import { purgeUser } from './purge-user';
 import { affectedRestrooms, recomputeRating } from './rating-aggregate';
+import { cleanupRestroom } from './restroom-cleanup';
+import { purgeCutoff, recomputePending, recomputeTrust } from './trust';
 
 initializeApp();
 
@@ -87,3 +91,112 @@ export const onReviewWritten = onDocumentWritten('reviews/{reviewId}', async (ev
     }
   }
 });
+
+/**
+ * The community's verdict on a restroom, counted.
+ *
+ * Owns `confirmCount`, `reportCount`, `trustScore`, `verified` and `hiddenAt` —
+ * none of which any client may write. Two verified students promote an entry,
+ * or one admin, which is the only reason the map can be bootstrapped before
+ * anyone has confirmed a @clsu.edu.ph address.
+ */
+export const onVoteWritten = onDocumentWritten('restroomVotes/{voteId}', async (event) => {
+  const restroomId = (event.data?.after.data() ?? event.data?.before.data())?.restroomId;
+  if (typeof restroomId !== 'string' || !restroomId) return;
+
+  try {
+    await recomputeTrust(restroomId);
+  } catch (e) {
+    // Logged, not rethrown, exactly as onReviewWritten does: the next vote on
+    // this restroom recomputes from scratch, so a retry of the whole event buys
+    // nothing that self-healing does not already give.
+    logger.error('onVoteWritten: recompute failed', { restroomId, error: String(e) });
+  }
+});
+
+/**
+ * Keeps each author's `pendingRestroomCount` honest.
+ *
+ * This is the number the contribution cap reads in `firestore.rules`, which
+ * cannot count a collection itself.
+ *
+ * ⚠️ **The cascade here is deliberate and it terminates.** A vote writes the
+ * restroom (above), which fires this, which writes only the USER document.
+ * Nothing writes back to the restroom, so there is no loop — but adding any
+ * restroom write to this function would create one.
+ */
+export const onRestroomWritten = onDocumentWritten('restrooms/{restroomId}', async (event) => {
+  const before = event.data?.before.data()?.createdBy;
+  const after = event.data?.after.data()?.createdBy;
+
+  // A set, because a re-key during account deletion moves a restroom from one
+  // author to another and both counts change.
+  const authors = new Set(
+    [before, after].filter((uid): uid is string => typeof uid === 'string' && uid !== ''),
+  );
+
+  for (const uid of authors) {
+    try {
+      await recomputePending(uid);
+    } catch (e) {
+      logger.error('onRestroomWritten: pending recompute failed', { uid, error: String(e) });
+    }
+  }
+});
+
+/**
+ * Everything a deleted restroom leaves behind.
+ *
+ * One path for both deleters — the author removing their own entry, and the
+ * scheduled purge below — so neither can forget a step the other remembers.
+ */
+export const onRestroomDeleted = onDocumentDeleted(
+  'restrooms/{restroomId}',
+  async (event) => {
+    const restroomId = event.params.restroomId;
+    try {
+      await cleanupRestroom(restroomId);
+    } catch (e) {
+      // Orphaned bytes cost storage; a failed retry would cost nothing more.
+      logger.error('onRestroomDeleted: cleanup failed', { restroomId, error: String(e) });
+    }
+  },
+);
+
+/**
+ * Deletes restrooms the community hid more than a week ago.
+ *
+ * The week is a grace period with a purpose: "I couldn't find it" and "this is
+ * fake" look identical from three reports, so hiding is reversible and only
+ * deletion is not. Confirmations arriving in that window clear `hiddenAt` and
+ * the entry simply returns.
+ *
+ * Deletes the document ONLY — `onRestroomDeleted` does the rest.
+ */
+export const purgeHiddenRestrooms = onSchedule(
+  { schedule: 'every 24 hours', timeoutSeconds: 540, memory: '512MiB' },
+  async () => {
+    const db = getFirestore();
+    const stale = await db
+      .collection('restrooms')
+      .where('hiddenAt', '<=', purgeCutoff(new Date()))
+      .limit(200)
+      .get();
+
+    logger.info('purgeHiddenRestrooms: starting', { count: stale.size });
+
+    // One at a time rather than a batch: each delete fires onRestroomDeleted,
+    // and a failure part-way should leave the rest to the next run rather than
+    // rolling back deletions whose cleanup has already happened.
+    for (const doc of stale.docs) {
+      try {
+        await doc.ref.delete();
+      } catch (e) {
+        logger.error('purgeHiddenRestrooms: delete failed', {
+          restroomId: doc.id,
+          error: String(e),
+        });
+      }
+    }
+  },
+);

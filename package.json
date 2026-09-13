@@ -14,6 +14,8 @@
     "test:watch": "jest --watch",
     "doctor": "npx expo-doctor",
     "seed:buildings": "tsx scripts/seed-buildings.ts",
+    "grant:admin": "tsx scripts/grant-admin.ts",
+    "backfill:trust": "tsx scripts/backfill-trust.ts",
     "test:rules": "npx --yes firebase-tools@15.30.0 emulators:exec --only firestore --project flushy-flash-rules-test \"npm --prefix rules test\"",
     "typecheck:all": "tsc --noEmit && tsc --noEmit -p scripts/tsconfig.json && npm --prefix rules run typecheck && npm --prefix functions run typecheck",
     "prebuild:android": "node scripts/check-firebase-config.mjs --platform android && expo prebuild --platform android --clean && node scripts/configure-android-build.mjs",

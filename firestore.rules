@@ -63,6 +63,24 @@ service cloud.firestore {
       return incoming().diff(current()).unchangedKeys().hasAll(keys);
     }
 
+    // unchanged() cannot express "absent on both sides", and that matters the
+    // moment a field is ADDED to an existing collection: unchangedKeys() only
+    // contains keys present in BOTH maps, so a document written before the
+    // field existed could never be updated again. This compares the values
+    // instead, defaulting both sides, so it is safe across a schema addition.
+    // Use it for new aggregates; unchanged() stays correct for the old ones,
+    // which every document already carries.
+    function pinned(key) {
+      return incoming().get(key, null) == current().get(key, null);
+    }
+
+    // How many UNVERIFIED restrooms one account may have at a time. Verified
+    // ones do not count, so contributing well costs nothing and contributing
+    // junk stalls at three, because nobody confirms junk.
+    function pendingCap() {
+      return 3;
+    }
+
     function isValidScore(value) {
       return value is int && value >= 1 && value <= 5;
     }
@@ -71,6 +89,7 @@ service cloud.firestore {
       return ['location', 'buildingId', 'floor', 'landmark', 'locationNote',
               'photoIds', 'amenities', 'status',
               'ratingSum', 'ratingCount', 'photoCount', 'verified',
+              'confirmCount', 'reportCount', 'trustScore', 'hiddenAt',
               'createdBy', 'createdAt', 'updatedAt'];
     }
 
@@ -112,9 +131,15 @@ service cloud.firestore {
       return ['userId', 'restroomId', 'createdAt'];
     }
 
+    function voteKeys() {
+      return ['restroomId', 'voterId', 'kind', 'byStudent', 'byAdmin',
+              'createdAt'];
+    }
+
     function userKeys() {
       return ['handle', 'displayName', 'photoURL', 'verifiedStudent',
-              'reviewCount', 'followerCount', 'followingCount', 'createdAt'];
+              'reviewCount', 'followerCount', 'followingCount',
+              'pendingRestroomCount', 'createdAt'];
     }
 
     // ---------- buildings ----------
@@ -164,11 +189,48 @@ service cloud.firestore {
         && incoming().ratingSum == 0
         && incoming().ratingCount == 0
         && incoming().photoCount == 0
-        && incoming().verified == false;
+        && incoming().verified == false
+        && incoming().confirmCount == 0
+        && incoming().reportCount == 0
+        && incoming().trustScore == 0
+        && incoming().hiddenAt == null
+        // The contribution cap. Rules cannot count a collection, so the
+        // count is a field on the author's profile that a Cloud Function
+        // maintains.
+        //
+        // .get(key, default) and NOT .pendingRestroomCount: reading an absent
+        // key raises an evaluation error rather than returning zero, and every
+        // user document written before this field existed lacks it. That is
+        // the same trap isAdmin() documents two screens up.
+        //
+        // The counter trails reality by the trigger's latency, so a scripted
+        // burst can briefly exceed the cap. What that buys is bounded and
+        // self-correcting - the counter converges, the account is then stuck
+        // below the cap until it deletes something, and the report path
+        // removes the junk anyway. An exact version would need slot ids like
+        // uid_0..2, which would change every Storage path under restrooms/{id}.
+        && get(/databases/$(database)/documents/users/$(request.auth.uid))
+             .data.get('pendingRestroomCount', 0) < pendingCap();
 
+      // The AUTHOR and admins, and nobody else.
+      //
+      // This used to admit any verified CLSU student, to ANY restroom - which
+      // meant one student account could move another person's pin off campus,
+      // rewrite the landmark, or grant the verified badge, silently and with
+      // no record of who did it. Community input now arrives as votes in
+      // restroomVotes, which are attributable and countable; a direct edit is
+      // neither.
       allow update: if hasProfile()
-        && (isSelf(current().createdBy) || isVerifiedStudent() || isAdmin())
+        && (isSelf(current().createdBy) || isAdmin())
         && unchanged(['ratingSum', 'ratingCount', 'photoCount', 'createdBy', 'createdAt'])
+        // Server-only now, all four of them. verified is no longer something a
+        // client may set at all: it is the OUTPUT of counting votes, and a
+        // client that could write it could skip the counting.
+        && pinned('confirmCount')
+        && pinned('reportCount')
+        && pinned('trustScore')
+        && pinned('hiddenAt')
+        && pinned('verified')
         && incoming().keys().hasOnly(restroomKeys())
         && incoming().status in ['ok', 'out_of_order', 'closed']
         && isOnCampus(incoming().location)
@@ -176,15 +238,66 @@ service cloud.firestore {
         && incoming().landmark.size() <= 80
         && incoming().locationNote is string
         && incoming().locationNote.size() <= 200
-        && isValidPhotoIds(incoming().photoIds)
-        && (unchanged(['verified']) || isVerifiedStudent() || isAdmin());
+        && isValidPhotoIds(incoming().photoIds);
 
-      // Narrow on purpose: only the author, and only before anyone else has
-      // invested a review or a photo in the entry.
+      // Narrow on purpose: the author, and only while nobody else has invested
+      // anything in the entry. The moment a stranger reviews it or vouches for
+      // it, it stops being the author's alone to remove.
+      //
+      // The confirmCount clause REPLACES a photoCount one rather than joining
+      // it. photoCount is pinned to 0 at create, unchanged on every update, and
+      // written by nothing anywhere in this project - so that clause could never
+      // be anything but true, and leaving a dead test beside a live one is how
+      // the next reader concludes both work. Photo counts come from
+      // photoIds.length; the author's own photos go with the restroom.
       allow delete: if isAdmin()
         || (isSelf(current().createdBy)
             && current().ratingCount == 0
-            && current().photoCount == 0);
+            && current().get('confirmCount', 0) == 0);
+    }
+
+    // ---------- restroom votes ----------
+    // The community's say on whether an entry is real. Two confirmations from
+    // verified students - or one from an admin, which counts double - promote a
+    // restroom to verified and free a slot in its author's quota. Three reports
+    // outnumbering the confirmations hide it, and a scheduled function removes
+    // it a week later.
+
+    match /restroomVotes/{voteId} {
+      // OWNER-SCOPED, unlike reviews, which are public.
+      //
+      // Who reported an entry as fake is exactly the thing that invites
+      // retaliation on a campus where a handle identifies a person. Only the
+      // AGGREGATE is public, and it lives on the restroom. Same reasoning likes
+      // already applies to behavioural data.
+      allow read: if isSelf(current().voterId) || isAdmin();
+
+      allow create: if hasProfile()
+        // The composite id is what makes one-vote-per-user structural rather
+        // than something a query has to police, exactly as it does for reviews.
+        && voteId == incoming().restroomId + '_' + request.auth.uid
+        && incoming().keys().hasOnly(voteKeys())
+        && incoming().voterId == request.auth.uid
+        && incoming().kind in ['confirm', 'report']
+        // Forced to agree with the TOKEN, never taken on the client's word -
+        // the same trick users.verifiedStudent uses. Without this any throwaway
+        // account could mint itself a student-weight confirmation and verify
+        // its own fakes.
+        && incoming().byStudent == isVerifiedStudent()
+        && incoming().byAdmin == isAdmin()
+        && exists(/databases/$(database)/documents/restrooms/$(incoming().restroomId))
+        // You do not get to vouch for your own entry.
+        && get(/databases/$(database)/documents/restrooms/$(incoming().restroomId))
+             .data.createdBy != request.auth.uid;
+
+      // No update path at all, exactly like likes: changing your mind is a
+      // delete and then a create. An editable vote would mean the byStudent
+      // flag could be re-evaluated against a token that has since changed,
+      // and it would make one-per-user a property of validation rather than
+      // of the key.
+      allow update: if false;
+
+      allow delete: if isSelf(current().voterId) || isAdmin();
     }
 
     // ---------- reviews ----------
@@ -249,11 +362,20 @@ service cloud.firestore {
         && incoming().reviewCount == 0
         && incoming().followerCount == 0
         && incoming().followingCount == 0
+        // Optional on create, unlike the counters above: hasOnly() permits a
+        // subset, and a client that omits it simply gets the default of zero
+        // from the cap check. Requiring it would mean every existing profile
+        // had to be backfilled before it could be edited again.
+        && incoming().get('pendingRestroomCount', 0) == 0
         && incoming().verifiedStudent == isVerifiedStudent();
 
       allow update: if isSelf(uid)
         && unchanged(['handle', 'createdAt'])
         && unchanged(['reviewCount', 'followerCount', 'followingCount'])
+        // pinned() rather than unchanged(): this field postdates every profile
+        // written so far, and unchangedKeys() omits a key that is absent on
+        // both sides - which would deny every future edit of an older profile.
+        && pinned('pendingRestroomCount')
         && incoming().keys().hasOnly(userKeys())
         && incoming().displayName is string
         && incoming().displayName.size() > 0

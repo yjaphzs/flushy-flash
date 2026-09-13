@@ -32,8 +32,25 @@ export function subscribeToRestrooms(
           // with the field undefined and every `photoIds.length` downstream
           // throws. One of those is inside the detail sheet, where the failure
           // renders as a blank sheet with no error at all.
-          return { id: d.id, ...data, photoIds: data.photoIds ?? [] } as Restroom;
-        }),
+          return {
+            id: d.id,
+            ...data,
+            photoIds: data.photoIds ?? [],
+            // Same defence, same reason: every restroom written before the
+            // trust system lacks these, and `confirmCount` reaching a
+            // `.toFixed()` or a comparison as undefined is a blank surface
+            // with no error rather than a visible failure.
+            confirmCount: data.confirmCount ?? 0,
+            reportCount: data.reportCount ?? 0,
+            trustScore: data.trustScore ?? 0,
+            hiddenAt: data.hiddenAt ?? null,
+          } as Restroom;
+        })
+          // Reported into hiding by the community. Filtered HERE, once, so it
+          // leaves the map, the nearest-restroom search and every count
+          // together — a screen that filtered for itself would be a screen
+          // the next one forgets to copy.
+          .filter((r) => r.hiddenAt === null),
       );
     },
     onError,
@@ -106,6 +123,13 @@ export async function createRestroom(input: {
     // delete rule keys off it. Photo counts come from photoIds.length.
     photoCount: 0,
     verified: false,
+    // All four required to be exactly this at create. Server-written from
+    // here on: onVoteWritten owns them, and the rules pin them against every
+    // client write.
+    confirmCount: 0,
+    reportCount: 0,
+    trustScore: 0,
+    hiddenAt: null,
     createdBy: input.createdBy,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

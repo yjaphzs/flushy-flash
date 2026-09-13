@@ -810,6 +810,101 @@ Stubbed — safe places to pick up: the review composer
 (`src/app/(app)/review/[restroomId].tsx`) and notifications
 (`src/app/(app)/(tabs)/notifications.tsx`, blocked on Cloud Functions — see §7).
 
+## The trust system: who may add, and who decides what stays
+
+A restroom starts **pending**. The community confirms it into **verified**, or
+reports it into **hidden** and then gone. One account may hold **3 pending**
+restrooms at a time; verified ones do not count, so contributing well costs
+nothing and contributing junk stalls at three, because nobody confirms junk.
+
+```
+        create                2 student confirms (or 1 admin)
+  ---------------> PENDING -------------------------------------> VERIFIED
+   (max 3 per user)   |                                        (frees a slot)
+                      | 3 reports, OUTNUMBERING the confirms
+                      v
+                   HIDDEN ------- 7 days -------> DELETED
+```
+
+`restroomVotes/{restroomId}_{uid}` carries
+`{ restroomId, voterId, kind, byStudent, byAdmin, createdAt }`. Five things
+about it are decisions, not detail:
+
+- **`byStudent` / `byAdmin` are client-written and rules-FORCED** to equal
+  `isVerifiedStudent()` / `isAdmin()`, the same trick `users.verifiedStudent`
+  uses. Without it any throwaway Google account mints itself student weight and
+  two of them verify a fake.
+- **There is no update path**, exactly like `likes`. Changing your mind is a
+  delete then a create. An editable vote would let `byStudent` be re-evaluated
+  against a token that has since changed.
+- **Reads are owner-scoped, unlike every other public collection here.**
+  Learning who reported your restroom is the beginning of retaliation, and a
+  handle on this campus is a name. Only the aggregate is public, on the
+  restroom.
+- **An ordinary confirmation counts but scores zero.** `confirmCount` is what
+  the UI shows ("3 people found this", which is true); `trustScore` is
+  `2 x admin + 1 x verified student` and is what promotes. `confirmCount >
+  trustScore` is the normal case, not a bug.
+- **Reports must OUTNUMBER confirmations**, not merely reach three. A confusing
+  entrance is not a fake one, and hiding leads to deletion a week later.
+
+⚠️ **`verified` is server-only now, and the update rule is author-or-admin.**
+It used to be that ANY verified CLSU student could edit ANY restroom — its
+location, its landmark, its `verified` flag — and nothing in the app ever
+called it, so the affordance existed only as a way to launder a fake onto the
+map. An existing rules assertion asserted exactly that and is now inverted.
+Community input arrives as votes, which are attributable and countable; a
+silent edit is neither.
+
+⚠️ **`hiddenAt` is a separate field and must not become a `status` value.**
+`status` (`ok`/`out_of_order`/`closed`) is the restroom’s real-world condition
+— `nearest.ts` filters on it, `StatusChip` renders it — and whether a toilet
+works is orthogonal to whether anyone believes it exists.
+
+### The cap, and the race it admits
+
+Rules cannot count a collection, so the count is a field:
+`users/{uid}.pendingRestroomCount`, maintained by `onRestroomWritten` and read
+by the create rule.
+
+⚠️ **The rule reads it as `.get('pendingRestroomCount', 0)`, not directly.**
+Reading an absent key is an evaluation error in rules rather than zero, and
+every profile written before this lacks the field — the same trap `isAdmin()`
+documents. The same reason `pinned()` exists beside `unchanged()`:
+`unchangedKeys()` omits a key absent on BOTH sides, so pinning a newly-added
+field with `unchanged()` would deny every future edit of an older document.
+
+**The counter trails reality by the trigger’s latency**, so a scripted burst
+can briefly exceed the cap. That is accepted, not overlooked: the count
+converges, the account is then stuck below the cap until it deletes something,
+and the report path removes the junk anyway. An exact version needs slot ids
+(`${uid}_0..2`), which would change every Storage path under `restrooms/{id}/`.
+
+### Bootstrapping, and why the admin claim finally exists
+
+`isAdmin()` is checked in nine places and, until now, **granted nowhere** — no
+`setCustomUserClaims` call existed. That became load-bearing: with no admin and
+no confirmed `@clsu.edu.ph` accounts, nothing could ever be verified, every
+contributor would hit the cap permanently, and the map would stop growing.
+`npm run grant:admin -- --email you@example.com` fixes it, and an admin
+confirmation scores 2 so one is enough.
+
+⚠️ **A custom claim does not reach a signed-in device until its token
+refreshes** (up to an hour). Sign out and in, or call `refreshClaims()`.
+
+### Cleanup, which never existed before
+
+`onRestroomDeleted` removes a restroom’s reviews, votes, likes and Storage
+prefix. Deleting a restroom used to orphan all of it — nobody noticed because
+nothing could delete one: the rules permitted it and no client ever called it.
+Hanging it off the trigger means the author deleting their own entry and
+`purgeHiddenRestrooms` share one path.
+
+⚠️ **A restroom reviewed or voted on before the trigger deployed still reads 0**
+until the next write. `npm run backfill:trust` exists because that is fine for
+the vote aggregates and NOT fine for `pendingRestroomCount`: until it runs, the
+cap does not apply to the people who have contributed most.
+
 **The map pin carries `★ 4.2 ·12`, maintained by a Cloud Function.**
 `functions/src/rating-aggregate.ts` recomputes `restrooms.ratingSum` /
 `ratingCount` on every `reviews/{reviewId}` write. Three things about it:
