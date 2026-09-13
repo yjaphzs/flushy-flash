@@ -4,8 +4,6 @@ import { router } from 'expo-router';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
 import { Chip } from '@/components/ui/chip';
-import { Icon } from '@/components/ui/icon';
-import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { useBottomInset } from '@/components/layouts/tab-bar-metrics';
@@ -17,7 +15,7 @@ import {
   StatLine,
   StatusChip,
 } from '@/features/restrooms/components/restroom-detail';
-import { usePhotoUrl } from '@/features/restrooms/use-photo-url';
+import { RestroomThumbnail } from '@/features/restrooms/components/restroom-thumbnail';
 import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useBuildings } from '@/stores/campus-store';
 import type { LatLng } from '@/lib/campus';
@@ -193,7 +191,7 @@ function SheetBody({
     */
     <View className="gap-4 pt-1" style={{ paddingBottom: bottomInset }}>
       <View className="flex-row items-center gap-3">
-        <Thumbnail path={restroom.photoIds[0]} />
+        <RestroomThumbnail path={restroom.photoIds[0]} size={THUMB} />
 
         <View className="flex-1 gap-0.5">
           {/*
@@ -264,30 +262,6 @@ function SheetBody({
         */}
         <Button.Label>View details</Button.Label>
       </Button>
-    </View>
-  );
-}
-
-/**
- * The first photo, at a fixed square.
- *
- * Not `PhotoStrip`: that is a 132pt horizontal list with its own label and its
- * own "No photos yet" row, and it is shared with the page and the review card,
- * so it cannot be shrunk for this one caller.
- */
-function Thumbnail({ path }: { path: string | undefined }) {
-  const url = usePhotoUrl(path);
-
-  return (
-    <View
-      className="items-center justify-center overflow-hidden rounded-2xl bg-surface-secondary"
-      style={{ width: THUMB, height: THUMB, borderCurve: 'continuous' }}
-    >
-      {url ? (
-        <Image source={{ uri: url }} style={{ width: THUMB, height: THUMB }} contentFit="cover" />
-      ) : (
-        <Icon name="image" size={24} color="muted" />
-      )}
     </View>
   );
 }
