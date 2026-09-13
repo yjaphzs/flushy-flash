@@ -5,7 +5,10 @@ import { BackButton } from '@/components/layouts/back-button';
 import { List } from '@/components/common/list';
 import { EmptyState } from '@/components/feedback/empty-state';
 import { Screen } from '@/components/layouts/screen';
-import { useScreenTopClearance } from '@/components/layouts/tab-bar-metrics';
+import {
+  useScreenBottomClearance,
+  useScreenTopClearance,
+} from '@/components/layouts/tab-bar-metrics';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
@@ -42,6 +45,8 @@ export default function MyRestroomsScreen() {
   const restrooms = useRestrooms();
   const buildings = useBuildings();
   const topInset = useScreenTopClearance();
+  // No tab bar on this route, and Screen pads nothing — the list owns it.
+  const paddingBottom = useScreenBottomClearance();
   const requestWrite = useRequestWrite();
 
   const { rows, pending } = useMemo(() => {
@@ -125,7 +130,7 @@ export default function MyRestroomsScreen() {
       <List
         data={rows}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, gap: 12, paddingBottom }}
         estimatedItemSize={92}
         ListHeaderComponent={<View className="gap-4 px-1 pb-2">{header}</View>}
         renderItem={({ item }) =>

@@ -64,7 +64,7 @@ export default function SettingsScreen() {
       title="Settings"
       subtitle="Your account and this device."
       onBack={() => router.back()}
-      contentContainerClassName="gap-5 px-5 pb-10"
+      contentContainerClassName="gap-5 px-5"
     >
       {error ? (
         <Callout tone="danger" testID="settings-error">

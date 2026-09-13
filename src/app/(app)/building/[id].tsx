@@ -42,7 +42,7 @@ export default function BuildingDetailScreen() {
         title={building?.name ?? (loading ? 'Loading…' : 'Unknown building')}
         subtitle={building?.code}
         onBack={() => router.back()}
-        contentContainerClassName="gap-4 px-5 pb-10"
+        contentContainerClassName="gap-4 px-5"
       >
         {loading && byFloor.length === 0 ? (
           <View className="items-center py-8">

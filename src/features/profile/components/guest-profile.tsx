@@ -28,7 +28,7 @@ export function GuestProfile() {
 
   return (
     <ScreenScrollView
-      contentContainerClassName="gap-6 px-5 py-6"
+      contentContainerClassName="gap-6 px-5 pt-6"
       // Uniwind composes contentContainerStyle = [classNameStyles, style], so
       // this overrides py-6's bottom half rather than adding to it.
       contentContainerStyle={{ paddingBottom: clearance }}

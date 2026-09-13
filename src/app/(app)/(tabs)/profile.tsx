@@ -35,7 +35,7 @@ export default function ProfileScreen() {
     */
     <ScreenScrollView
       topInset={false}
-      contentContainerClassName="gap-5 pb-6"
+      contentContainerClassName="gap-5"
       contentContainerStyle={{ paddingBottom: clearance }}
       testID="profile"
     >

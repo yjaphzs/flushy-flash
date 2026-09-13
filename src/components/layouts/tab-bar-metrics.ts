@@ -99,7 +99,37 @@ export function useScreenTopClearance(): number {
  *
  * Deliberately not `useTabBarOffset()`, whose own docblock reserves it for the
  * bar and anything pinned directly above it.
+ *
+ * This is the RAW inset, and it is rarely what a screen wants — it leaves
+ * content touching the gesture pill. Reach for `useScreenBottomClearance()`
+ * unless you are positioning a pinned bar that supplies its own padding.
  */
 export function useBottomInset(): number {
   return useSafeAreaInsets().bottom;
+}
+
+/**
+ * Breathing room between the last pixel of content and the safe-area inset.
+ *
+ * Double `SCREEN_TOP_GAP` on purpose. The top gap abuts the status bar, which
+ * is passive; the bottom abuts the system's own interactive affordance — the
+ * gesture pill, or the three-button row on a phone that still uses one. A tap
+ * target ending 12pt from those invites a mis-tap, and the buttons are the last
+ * thing on almost every screen.
+ */
+export const SCREEN_BOTTOM_GAP = 24;
+
+/**
+ * Window bottom to where content may safely END on a screen with no tab bar —
+ * the mirror of `useScreenTopClearance()`, and applied the same way, by
+ * `ScreenScrollView`.
+ *
+ * Unlike the top clearance this one applies on BOTH platforms. iOS adds
+ * `insets.bottom` of its own through `contentInsetAdjustmentBehavior`, so this
+ * over-pads there by that much — accepted for the reason `useTabBarClearance()`
+ * already gives: dead space at the end of a scroll is invisible, whereas a
+ * submit button under the navigation bar is a defect.
+ */
+export function useScreenBottomClearance(): number {
+  return useBottomInset() + SCREEN_BOTTOM_GAP;
 }

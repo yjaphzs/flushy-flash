@@ -48,7 +48,7 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <ScreenScrollView contentContainerClassName="gap-5 px-5 py-6" avoidsKeyboard>
+    <ScreenScrollView contentContainerClassName="gap-5 px-5 pt-6" avoidsKeyboard>
       {sent ? (
         <>
           <View className="gap-1">

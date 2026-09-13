@@ -3,6 +3,7 @@ import { GlassSurface } from '@/components/common/glass-surface';
 import { BrandGradient } from '@/components/common/gradient';
 import { BackButton } from '@/components/layouts/back-button';
 import { ScreenScrollView } from '@/components/layouts/screen';
+import { useScreenBottomClearance } from '@/components/layouts/tab-bar-metrics';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 
@@ -35,13 +36,22 @@ export type AuthScreenProps = {
  * full-bleed, and an in-screen control can be tinted against it.
  */
 export function AuthScreen({ title, subtitle, onBack, children, testID }: AuthScreenProps) {
+  const bottomClearance = useScreenBottomClearance();
+
   return (
     <ScreenScrollView
       backdrop={<BrandGradient />}
       className="flex-1 bg-transparent"
       // `grow` lets the sheet fill to the bottom of the screen instead of
       // floating as a card; `pb-0` keeps it flush there.
+      //
+      // Which is also why the container's own bottom clearance is turned OFF:
+      // it would push the glass sheet up and leave a band of gradient below it.
+      // The clearance moves onto the sheet's own padding instead, so the sheet
+      // still reaches the window edge and its last row still clears the
+      // navigation bar.
       contentContainerClassName="grow pb-0"
+      bottomInset={false}
       avoidsKeyboard
       testID={testID}
     >
@@ -67,7 +77,10 @@ export function AuthScreen({ title, subtitle, onBack, children, testID }: AuthSc
         </Text>
       </View>
 
-      <GlassSurface className="grow gap-6 rounded-t-[32px] rounded-b-none px-6 pb-10 pt-7">
+      <GlassSurface
+        className="grow gap-6 rounded-t-[32px] rounded-b-none px-6 pt-7"
+        style={{ paddingBottom: bottomClearance }}
+      >
         <View className="gap-1">
           <Text type="h2" accessibilityRole="header">
             {title}
