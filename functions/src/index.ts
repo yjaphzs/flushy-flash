@@ -9,7 +9,12 @@ import { logger } from 'firebase-functions';
 import { purgeUser } from './purge-user';
 import { affectedRestrooms, recomputeRating } from './rating-aggregate';
 import { cleanupRestroom } from './restroom-cleanup';
-import { purgeCutoff, recomputePending, recomputeTrust } from './trust';
+import {
+  PURGE_LOWER_BOUND,
+  purgeCutoff,
+  recomputePending,
+  recomputeTrust,
+} from './trust';
 
 initializeApp();
 
@@ -179,6 +184,10 @@ export const purgeHiddenRestrooms = onSchedule(
     const db = getFirestore();
     const stale = await db
       .collection('restrooms')
+      // Both bounds, deliberately. See PURGE_LOWER_BOUND: null sorts below
+      // every timestamp, so the upper bound alone would match every restroom
+      // that is not hidden at all.
+      .where('hiddenAt', '>', PURGE_LOWER_BOUND)
       .where('hiddenAt', '<=', purgeCutoff(new Date()))
       .limit(200)
       .get();

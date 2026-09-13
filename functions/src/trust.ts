@@ -159,3 +159,21 @@ export const PURGE_AFTER_DAYS = 7;
 export function purgeCutoff(now: Date): Timestamp {
   return Timestamp.fromMillis(now.getTime() - PURGE_AFTER_DAYS * 24 * 60 * 60 * 1000);
 }
+
+/**
+ * Lower bound for the purge query, and it is NOT decoration.
+ *
+ * ⚠️ **In Firestore's total ordering `null` sorts BEFORE every timestamp**, so
+ * `where('hiddenAt', '<=', cutoff)` on its own matches every document whose
+ * `hiddenAt` is null — which is every restroom that is perfectly fine.
+ * `createRestroom` writes `hiddenAt: null` because the create rule demands it,
+ * so without this bound the scheduled purge would delete the entire map on its
+ * next run, one restroom at a time, with each delete firing the cleanup that
+ * removes its photos and reviews too.
+ *
+ * A second bound on the same field needs no composite index, and nothing real
+ * can predate the epoch, so it excludes exactly the nulls and nothing else.
+ * Documents written before `hiddenAt` existed are excluded either way: a range
+ * filter never matches a document missing the field.
+ */
+export const PURGE_LOWER_BOUND = Timestamp.fromMillis(0);

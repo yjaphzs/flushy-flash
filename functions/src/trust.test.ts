@@ -1,4 +1,12 @@
-import { isVerified, shouldHide, tally } from './trust';
+import { Timestamp } from 'firebase-admin/firestore';
+
+import {
+  isVerified,
+  purgeCutoff,
+  PURGE_LOWER_BOUND,
+  shouldHide,
+  tally,
+} from './trust';
 
 const confirm = (o: Partial<{ byStudent: boolean; byAdmin: boolean }> = {}) => ({
   kind: 'confirm',
@@ -87,5 +95,32 @@ describe('shouldHide', () => {
     expect(t.trustScore).toBe(0);
     expect(isVerified(t)).toBe(false);
     expect(shouldHide(t)).toBe(false);
+  });
+});
+
+/**
+ * The bound that stops the scheduled purge deleting the whole map.
+ *
+ * These assert the ORDERING fact the query depends on, not the query itself:
+ * Firestore sorts null before every timestamp, so an upper bound alone matches
+ * every restroom whose `hiddenAt` is null — and `createRestroom` writes exactly
+ * that on every new entry, because the create rule demands it.
+ */
+describe('PURGE_LOWER_BOUND', () => {
+  const cutoff = purgeCutoff(new Date('2026-09-20T00:00:00Z'));
+
+  it('sits below any real hiddenAt, so it excludes only the nulls', () => {
+    const hiddenLongAgo = Timestamp.fromDate(new Date('2026-09-01T00:00:00Z'));
+    expect(PURGE_LOWER_BOUND.toMillis()).toBeLessThan(hiddenLongAgo.toMillis());
+    expect(hiddenLongAgo.toMillis()).toBeLessThanOrEqual(cutoff.toMillis());
+  });
+
+  it('puts the cutoff seven days back', () => {
+    expect(cutoff.toDate().toISOString()).toBe('2026-09-13T00:00:00.000Z');
+  });
+
+  it('does not sweep up a restroom hidden yesterday', () => {
+    const hiddenYesterday = Timestamp.fromDate(new Date('2026-09-19T00:00:00Z'));
+    expect(hiddenYesterday.toMillis()).toBeGreaterThan(cutoff.toMillis());
   });
 });
