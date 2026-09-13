@@ -48,6 +48,7 @@ export const COLLECTIONS = {
   follows: 'follows',
   likes: 'likes',
   restroomVotes: 'restroomVotes',
+  notifications: 'notifications',
 } as const;
 
 /** Composite ids that let security rules enforce uniqueness without a query. */

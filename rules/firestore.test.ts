@@ -353,6 +353,113 @@ describe('likes', () => {
   });
 });
 
+describe('notifications', () => {
+  const NOTIF_ID = 'rev_restroom-1_bob-uid';
+
+  function notificationDoc(overrides: Record<string, unknown> = {}) {
+    return {
+      userId: ALICE,
+      kind: 'review',
+      actorId: BOB,
+      restroomId: RESTROOM_ID,
+      reviewId: RESTROOM_ID + '_' + BOB,
+      readAt: null,
+      createdAt: new Date(),
+      ...overrides,
+    };
+  }
+
+  /** Only a Cloud Function can create one, so every test seeds past the rules. */
+  async function seedForAlice(overrides: Record<string, unknown> = {}) {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'notifications', NOTIF_ID), notificationDoc(overrides));
+    });
+  }
+
+  /**
+   * The whole reason the collection is server-only. A notification is written
+   * BY one party INTO another's inbox; a client that can create one can spam
+   * anybody, and can forge the actor on a message the recipient will trust.
+   */
+  it('denies creating a notification, even for yourself', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(setDoc(doc(db, 'notifications', NOTIF_ID), notificationDoc()));
+  });
+
+  it('denies creating one in somebody elses inbox', async () => {
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(
+      setDoc(doc(db, 'notifications', 'forged'), notificationDoc({ userId: ALICE })),
+    );
+  });
+
+  it('lets the recipient read their own notification', async () => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(getDoc(doc(db, 'notifications', NOTIF_ID)));
+  });
+
+  // An inbox records what was done to you, including who confirmed an entry -
+  // which restroomVotes is owner-scoped to keep private in the first place.
+  it('denies reading somebody elses inbox', async () => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(getDoc(doc(db, 'notifications', NOTIF_ID)));
+  });
+
+  it('lets the recipient mark it read', async () => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(
+      updateDoc(doc(db, 'notifications', NOTIF_ID), { readAt: serverTimestamp() }),
+    );
+  });
+
+  it('denies marking somebody elses notification read', async () => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(updateDoc(doc(db, 'notifications', NOTIF_ID), { readAt: serverTimestamp() }));
+  });
+
+  // readAt is the ONLY mutable field. Everything else is the server's record of
+  // what happened, and a recipient who could rewrite it could rewrite history.
+  it.each([
+    ['kind', { kind: 'verified' }],
+    ['userId', { userId: BOB }],
+    ['actorId', { actorId: ALICE }],
+    ['restroomId', { restroomId: 'somewhere-else' }],
+    ['reviewId', { reviewId: 'another-review' }],
+  ])('denies rewriting %s', async (_field, patch) => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'notifications', NOTIF_ID), patch));
+  });
+
+  it('rejects an unknown field on the update', async () => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertFails(updateDoc(doc(db, 'notifications', NOTIF_ID), { sneaky: true }));
+  });
+
+  it('lets the recipient delete it', async () => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(deleteDoc(doc(db, 'notifications', NOTIF_ID)));
+  });
+
+  it('denies deleting somebody elses notification', async () => {
+    await seedForAlice();
+    const db = testEnv.authenticatedContext(BOB, outsider).firestore();
+    await assertFails(deleteDoc(doc(db, 'notifications', NOTIF_ID)));
+  });
+
+  it('denies an unauthenticated read', async () => {
+    await seedForAlice();
+    const db = testEnv.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(db, 'notifications', NOTIF_ID)));
+  });
+});
+
 describe('restrooms', () => {
   it('allows a signed-in user to add a restroom to a real building', async () => {
     const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();

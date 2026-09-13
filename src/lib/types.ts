@@ -219,6 +219,48 @@ export type Like = {
   createdAt: Timestamp;
 };
 
+/** What happened to something you contributed. */
+export type NotificationKind = 'review' | 'verified' | 'confirmed' | 'hidden';
+
+/**
+ * One entry in your inbox.
+ *
+ * ⚠️ **Written ONLY by a Cloud Function.** `firestore.rules` has
+ * `allow create: if false` on this collection — for anyone, including the
+ * recipient. A notification is written BY one party INTO another's inbox, and
+ * any rule permissive enough to let a client do that is a spam vector. The one
+ * client write is setting `readAt`.
+ *
+ * The id is DERIVED, not random — `rev_{reviewId}`, `con_{voteId}`,
+ * `ver_{restroomId}`, `hid_{restroomId}` — which is what makes the Function
+ * safe to retry. See `functions/src/notifications.ts`.
+ */
+export type Notification = {
+  id: string;
+  /** The recipient. Owner-scoped in the rules; nobody else may read it. */
+  userId: string;
+  kind: NotificationKind;
+  /**
+   * ⚠️ **Null on every kind but `review`, and that is a privacy guarantee.**
+   *
+   * `restroomVotes` is owner-scoped precisely so that who confirmed or reported
+   * an entry stays private — on this campus a handle identifies a person, and
+   * learning who doubted your restroom is the beginning of retaliation. A
+   * `confirmed` notification naming its voter would route straight around that
+   * rule, so the Function never writes one.
+   *
+   * `review` names its actor because reviews are world-readable and already
+   * render an author chip; it reveals nothing the review does not.
+   */
+  actorId: string | null;
+  restroomId: string;
+  /** Only on `review`. */
+  reviewId: string | null;
+  /** Null until the recipient opens it. The only field a client may write. */
+  readAt: Timestamp | null;
+  createdAt: Timestamp;
+};
+
 /**
  * Live, ephemeral status. Realtime Database, not Firestore.
  *

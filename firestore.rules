@@ -146,6 +146,13 @@ service cloud.firestore {
               'createdAt'];
     }
 
+    // Written only by a Cloud Function, but listed for the same reason every
+    // other shape is: the update rule below uses hasOnly(), so a client that
+    // invents a key is refused rather than silently accepted.
+    function notificationKeys() {
+      return ['userId', 'kind', 'actorId', 'restroomId', 'reviewId', 'readAt', 'createdAt'];
+    }
+
     function userKeys() {
       return ['handle', 'displayName', 'photoURL', 'verifiedStudent',
               'reviewCount', 'followerCount', 'followingCount',
@@ -444,6 +451,47 @@ service cloud.firestore {
       // A like has no mutable state. Unliking is a delete, which is what keeps
       // the composite-id uniqueness argument intact.
       allow update: if false;
+      allow delete: if isSelf(current().userId) || isAdmin();
+    }
+
+    // ---------- notifications ----------
+    // What happened to things you contributed: somebody reviewed your restroom,
+    // the community verified it, somebody confirmed it, reports hid it.
+    //
+    // ⚠️ **NOBODY MAY CREATE ONE, INCLUDING THE RECIPIENT.** A notification is
+    // written BY one party INTO another party's inbox, and any rule permissive
+    // enough to let a client do that is a spam vector — `allow create: if
+    // isSignedIn()` lets anyone write anything into anyone's feed. The only
+    // honest writer is a Cloud Function with admin credentials, which bypasses
+    // these rules entirely. That is why `create` is flatly false rather than
+    // conditioned on anything.
+    //
+    // The collection had no block at all until now, which the catch-all at the
+    // bottom already denied — so the Function could write but the owner could
+    // not read. This block exists for the READ.
+
+    match /notifications/{notificationId} {
+      // Owner-scoped, like likes and restroomVotes. An inbox is the most
+      // behavioural data in the app: it records what was done to you, and who
+      // confirmed or reported an entry is exactly what restroomVotes is
+      // owner-scoped to keep private.
+      allow read: if isSelf(current().userId) || isAdmin();
+
+      // Server-only. See above.
+      allow create: if false;
+
+      // The single client write in the whole collection: marking it read.
+      //
+      // AGENTS.md sketched this as `affectedKeys().hasOnly(['readAt'])`. This
+      // file does not use affectedKeys() anywhere, so it stays on the house
+      // idiom — hasOnly() for the shape, unchanged() for the immutable half.
+      // unchanged() is safe here rather than pinned(): the Function writes
+      // every key at create, including a null readAt, so none is absent on one
+      // side of the diff.
+      allow update: if isSelf(current().userId)
+        && incoming().keys().hasOnly(notificationKeys())
+        && unchanged(['userId', 'kind', 'actorId', 'restroomId', 'reviewId', 'createdAt']);
+
       allow delete: if isSelf(current().userId) || isAdmin();
     }
 

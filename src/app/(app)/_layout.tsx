@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { useAuthGateResume } from '@/features/auth/use-auth-gate';
 import { useCampusData } from '@/hooks/use-campus-data';
 import { useMyLikes } from '@/hooks/use-my-likes';
+import { useMyNotifications } from '@/hooks/use-my-notifications';
 import { useMyVotes } from '@/hooks/use-my-votes';
 import { UpdateDialog } from '@/features/updates/components/update-dialog';
 import { useUpdateCheck } from '@/features/updates/use-update-check';
@@ -25,6 +26,10 @@ export default function AppLayout() {
   // for or reported. Votes are owner-scoped, so this is the only way the trust
   // row knows whether to show the action or the state.
   useMyVotes();
+
+  // Here and not on the Alerts screen: the tab badge needs the count before
+  // anyone opens the tab, and every tab but the map is lazy.
+  useMyNotifications();
 
   // Here rather than on a screen: (app) is permanently mounted, so a download
   // in flight survives navigation and the dialog never remounts mid-transfer.

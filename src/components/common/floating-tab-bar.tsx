@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/motion';
 import { Pressable } from '@/components/ui/pressable';
 import { View } from '@/components/ui/view';
+import { useUnreadCount } from '@/stores/notifications-store';
 
 /**
  * The floating pill that replaces the native tab bar.
@@ -64,6 +65,7 @@ export function FloatingTabBar({
 }: FloatingTabBarProps) {
   const bottom = useTabBarOffset();
   const reduced = useReducedMotion();
+  const unread = useUnreadCount();
 
   /**
    * `tabPress` is emitted on EVERY press, focused or not, and that is not a
@@ -162,6 +164,14 @@ export function FloatingTabBar({
         selected={state.index === index}
         onPress={() => select(index)}
         onMeasure={(centre) => measure(index, centre)}
+        /*
+          Read here rather than plumbed through (tabs)/_layout.tsx. This
+          component already knows this app's route names and its centre action
+          — AGENTS.md §8 sanctions exactly that — so one more app fact is
+          consistent, and react-navigation's own `options.tabBarBadge` is not
+          wired to anything in a custom `tabBar`.
+        */
+        badge={route.name === 'notifications' ? unread : 0}
         height={TAB_BAR_HEIGHT}
         size={HIGHLIGHT}
         iconSize={ICON}
