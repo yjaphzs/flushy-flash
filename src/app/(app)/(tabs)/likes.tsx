@@ -16,7 +16,7 @@ import {
 import { useCanWrite } from '@/stores/auth-store';
 import { useBuildings, useRestrooms } from '@/stores/campus-store';
 import { useIsOnline } from '@/stores/connection-store';
-import { useLikedIds, useLikesLoading } from '@/stores/likes-store';
+import { useLikedIds, useLikesError, useLikesLoading, useLikesStore } from '@/stores/likes-store';
 
 /**
  * The restrooms you saved.
@@ -35,6 +35,7 @@ export default function LikesScreen() {
   const requestWrite = useRequestWrite();
   const likedIds = useLikedIds();
   const loading = useLikesLoading();
+  const error = useLikesError();
   const online = useIsOnline();
   const restrooms = useRestrooms();
   const buildings = useBuildings();
@@ -90,9 +91,51 @@ export default function LikesScreen() {
   }
 
   /*
-    Before the empty branch. This list is a join of two stores, so a cold cache
-    with no signal empties it without anything failing — and "Nothing saved yet"
-    is a statement about what the user has done, not about the connection.
+    ⚠️ Before the empty branch, and this ordering is the whole point of the
+    branch existing.
+
+    The store has carried an `error` since it was written and this screen never
+    read it — so a listener that failed rendered "Nothing saved yet" to somebody
+    whose saved list was fine. An errored onSnapshot detaches PERMANENTLY, so
+    that state was also final: no amount of waiting fixed it.
+
+    The retry is therefore not a nicety. `review-list.tsx` makes the same
+    argument for the same reason.
+
+    ⚠️ It also sits ABOVE the offline branch below, which is not arbitrary.
+    Offline does not normally produce an error at all — Firestore serves the
+    disk cache — so the two rarely coincide. When they do, this is the branch
+    that carries the retry, and re-subscribing is the only thing that recovers
+    a detached listener.
+  */
+  if (error) {
+    return (
+      <Screen style={{ paddingBottom: clearance }}>
+        <EmptyState
+          icon="alert-circle"
+          title="Could not load your saved list"
+          description={error}
+          action={
+            <Button
+              size="lg"
+              variant="secondary"
+              className="rounded-full"
+              onPress={() => useLikesStore.getState().retry()}
+            >
+              <Button.Label>Try again</Button.Label>
+            </Button>
+          }
+          testID="likes-error"
+        />
+      </Screen>
+    );
+  }
+
+  /*
+    Then offline, still before the empty branch. This list is a join of two
+    stores, so a cold cache with no signal empties it without anything failing —
+    and "Nothing saved yet" is a statement about what the user has done, not
+    about the connection.
   */
   if (saved.length === 0 && !online) {
     return (
