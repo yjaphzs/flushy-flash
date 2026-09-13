@@ -161,19 +161,27 @@ export function purgeCutoff(now: Date): Timestamp {
 }
 
 /**
- * Lower bound for the purge query, and it is NOT decoration.
+ * ⚠️ **`where('hiddenAt', '<=', cutoff)` does NOT match a null `hiddenAt`, and
+ * it is worth knowing why before you `fix` it.**
  *
- * ⚠️ **In Firestore's total ordering `null` sorts BEFORE every timestamp**, so
- * `where('hiddenAt', '<=', cutoff)` on its own matches every document whose
- * `hiddenAt` is null — which is every restroom that is perfectly fine.
- * `createRestroom` writes `hiddenAt: null` because the create rule demands it,
- * so without this bound the scheduled purge would delete the entire map on its
- * next run, one restroom at a time, with each delete firing the cleanup that
- * removes its photos and reviews too.
+ * Every visible restroom carries `hiddenAt: null` — `createRestroom` writes it
+ * because the create rule demands exactly that. Firestore's ORDER BY semantics
+ * sort null before every timestamp, so it looks very much as though the purge's
+ * upper bound alone would sweep up the entire map and hand each one to
+ * `onRestroomDeleted`, photos and reviews included.
  *
- * A second bound on the same field needs no composite index, and nothing real
- * can predate the epoch, so it excludes exactly the nulls and nothing else.
- * Documents written before `hiddenAt` existed are excluded either way: a range
- * filter never matches a document missing the field.
+ * It does not. **Range comparisons in Firestore are type-scoped**: `<=` against
+ * a Timestamp matches only Timestamp values, and null is a different type. The
+ * null-ordering rule governs sorting, not inequality filtering.
+ *
+ * Measured against the live project rather than assumed, because the cost of
+ * being wrong here is the whole collection:
+ *
+ *     createdAt <= future        -> 1   (range filters do work here)
+ *     hiddenAt  <= future        -> 0   (hiddenAt is null on that document)
+ *     hiddenAt  == null          -> 1   (equality is what sees nulls)
+ *
+ * A defensive `hiddenAt > epoch` lower bound was added and then removed: it
+ * excluded nothing, and its comment asserted behaviour Firestore does not have,
+ * which is worse than no comment at all.
  */
-export const PURGE_LOWER_BOUND = Timestamp.fromMillis(0);

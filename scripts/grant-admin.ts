@@ -64,6 +64,22 @@ async function main() {
     return;
   }
 
+  /**
+   * ADC user credentials need a quota project, and without one this fails with
+   * a wrapped URL and nothing that names the cause.
+   *
+   * `gcloud auth application-default login` writes credentials with no quota
+   * project attached, so the Identity Toolkit and Firestore APIs reject them
+   * even though the credentials are perfectly valid and `gcloud auth
+   * application-default print-access-token` happily mints a token. Setting it
+   * here rather than telling the operator to run
+   * `gcloud auth application-default set-quota-project`, because that mutates
+   * their global gcloud config to make one script work.
+   *
+   * `??=` so an explicit environment value still wins.
+   */
+  process.env.GOOGLE_CLOUD_QUOTA_PROJECT ??=
+    process.env.FIREBASE_PROJECT_ID ?? 'flushy-flash';
   const { applicationDefault, initializeApp } = await import('firebase-admin/app');
   const { getAuth } = await import('firebase-admin/auth');
 
