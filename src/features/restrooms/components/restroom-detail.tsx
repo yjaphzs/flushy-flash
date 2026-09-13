@@ -2,6 +2,7 @@ import { Chip } from '@/components/ui/chip';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
+import { ACCESS, AMENITIES, STATUS } from '@/features/restrooms/labels';
 import { formatDistance } from '@/lib/geo';
 import type { Amenities, GenderedAs, Restroom, RestroomStatus } from '@/lib/types';
 
@@ -18,28 +19,6 @@ import type { Amenities, GenderedAs, Restroom, RestroomStatus } from '@/lib/type
  * source for either, and a heuristic rendered as a percentage looks like a
  * measurement.
  */
-
-const STATUS: Record<RestroomStatus, { label: string; color: 'success' | 'warning' | 'danger' }> = {
-  ok: { label: 'Open', color: 'success' },
-  out_of_order: { label: 'Out of order', color: 'danger' },
-  closed: { label: 'Closed', color: 'warning' },
-};
-
-const ACCESS: Record<GenderedAs, string> = {
-  male: 'Men',
-  female: 'Women',
-  unisex: 'Anyone',
-  accessible_only: 'Accessible only',
-};
-
-/** Only the amenities with a glyph that reads at 18px. */
-const AMENITIES: { key: keyof Omit<Amenities, 'genderedAs'>; label: string; icon: IconName }[] = [
-  { key: 'isFree', label: 'Free', icon: 'badge-check' },
-  { key: 'hasWater', label: 'Water', icon: 'droplet' },
-  { key: 'hasTissue', label: 'Tissue', icon: 'scroll-text' },
-  { key: 'hasBidet', label: 'Bidet', icon: 'shower-head' },
-  { key: 'accessible', label: 'Accessible', icon: 'accessibility' },
-];
 
 export function StatusChip({ status }: { status: RestroomStatus }) {
   const { label, color } = STATUS[status];

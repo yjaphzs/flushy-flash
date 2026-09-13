@@ -20,7 +20,9 @@ import LocateFixed from 'lucide-react-native/icons/locate-fixed';
 import MapPin from 'lucide-react-native/icons/map-pin';
 import Plus from 'lucide-react-native/icons/plus';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
+import Search from 'lucide-react-native/icons/search';
 import Settings from 'lucide-react-native/icons/settings';
+import SlidersHorizontal from 'lucide-react-native/icons/sliders-horizontal';
 import GraduationCap from 'lucide-react-native/icons/graduation-cap';
 import ScrollText from 'lucide-react-native/icons/scroll-text';
 import ShowerHead from 'lucide-react-native/icons/shower-head';
@@ -81,17 +83,28 @@ export type IconName =
   | 'shower-head'
   | 'accessibility'
   | 'clock'
-  | 'image';
+  | 'image'
+  | 'search'
+  | 'filter';
 
 /** `typeof Heart` rather than importing LucideIcon — one fewer specifier. */
 type Glyph = typeof Heart;
 
 /**
+ * Two entries whose Lucide file is NOT named after our key.
+ *
  * `alert-circle` maps to Lucide's `circle-alert`: Lucide renamed it and the old
  * name survives ONLY as a deprecated alias inside the barrel, so there is no
  * `icons/alert-circle.mjs` to import. Our own name is kept so callout.tsx does
  * not have to change. Verified: that path is a 404 on the registry and absent
  * from node_modules.
+ *
+ * `filter` is the same trap with a twist. Lucide renamed `filter` → `funnel`,
+ * so `icons/filter.mjs` does not exist either — verified in node_modules. But
+ * the replacement here is `sliders-horizontal` rather than `funnel`, on
+ * purpose: the control it labels opens a sheet of toggles, and sliders read as
+ * "adjust these" where a funnel reads as "narrow a list". Our key stays
+ * `filter` because that is what the feature is called everywhere else.
  */
 const GLYPHS: Record<IconName, Glyph> = {
   mail: Mail,
@@ -125,6 +138,8 @@ const GLYPHS: Record<IconName, Glyph> = {
   accessibility: Accessibility,
   clock: Clock,
   image: ImageIcon,
+  search: Search,
+  filter: SlidersHorizontal,
 };
 
 /** Theme tokens an icon may be tinted with, including this app's own. */

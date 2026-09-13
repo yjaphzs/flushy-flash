@@ -33,6 +33,8 @@ type MapFocusState = {
   begin: () => number;
   succeed: (attempt: number, to: { lat: number; lng: number }, label: string) => void;
   fail: (attempt: number, outcome: Exclude<NearestOutcome, 'idle' | 'locating' | 'found'>) => void;
+  /** Move the camera with no search attached — see the implementation. */
+  focusOn: (to: { lat: number; lng: number }) => void;
   /** User dismissed the search. Disowns whatever is in flight. */
   cancel: () => void;
   /** Clears a settled message. Used by the auto-dismiss timer on the map. */
@@ -74,6 +76,21 @@ export const useMapFocusStore = create<MapFocusState>((set, get) => ({
 
   fail: (attempt, outcome) =>
     set((s) => (s.attempt !== attempt ? s : { outcome, label: null })),
+
+  /**
+   * Point the camera somewhere, with no search attached.
+   *
+   * ⚠️ Deliberately NOT `succeed()`, which looks like it would do. That action
+   * is attempt-gated, so a caller would first have to `begin()` — which sets
+   * `outcome: 'locating'` and opens `SearchingDialog` over the map — and it
+   * then forces `outcome: 'found'`, painting a green banner in the same top
+   * band the search bar occupies. Both are right for "find me the nearest
+   * one" and wrong for "I tapped a result I can already see".
+   *
+   * The nonce still increments, so tapping the same result twice re-fires the
+   * camera rather than being swallowed by an equality check.
+   */
+  focusOn: (to) => set((s) => ({ focus: { ...to, nonce: (s.focus?.nonce ?? 0) + 1 } })),
 
   cancel: () => set((s) => ({ attempt: s.attempt + 1, outcome: 'idle', label: null })),
 
