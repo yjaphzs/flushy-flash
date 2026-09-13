@@ -2,7 +2,7 @@
   "expo": {
     "name": "Flushy Flash",
     "slug": "flushy-flash",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "scheme": "flushyflash",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
