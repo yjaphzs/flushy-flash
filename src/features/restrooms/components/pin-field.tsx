@@ -32,7 +32,20 @@ export function PinField({ point, building }: PinFieldProps) {
     return (
       <View className="gap-2">
         <Text type="h4">Where is it?</Text>
-        <Button variant="secondary" size="lg" className="rounded-full" onPress={open}>
+        {/*
+          `sm`, matching the "Choose photos" button directly below it — the two
+          differed by nothing but this prop, which made the map button 56pt
+          against its 40pt and read as the more important of the two.
+
+          heroui's Button has no StartContent part; the compound is only Label
+          and Background. Ordering plain children IS the supported pattern —
+          the root is already flex-row items-center with a per-size gap (6pt
+          at `sm`) — and the wrapper types children as
+          `Exclude<ReactNode, string | number>`, so only a BARE string is
+          rejected and an element array passes through untouched.
+        */}
+        <Button variant="secondary" size="sm" className="rounded-full" onPress={open}>
+          <Icon name="map" size={16} color="accent-soft-foreground" />
           <Button.Label>Choose on the map</Button.Label>
         </Button>
         <Text type="body-xs" color="muted">

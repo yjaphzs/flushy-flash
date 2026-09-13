@@ -144,10 +144,17 @@ export default function PickLocationScreen() {
         <CentrePin size={PIN} color={valid ? 'accent' : 'danger'} />
       </View>
 
-      {/* Opaque-ish: a bare chevron over arbitrary map tiles is unreadable. */}
+      {/*
+        Opaque-ish: a bare chevron over arbitrary map tiles is unreadable.
+
+        `edgeAligned={false}` because there is no content edge here — the
+        component's -ml-3 would drag the glyph off centre and squash the disc
+        into an ellipse. The box is sized explicitly to 48 so it matches the
+        locate button below rather than being 4pt smaller than its neighbour.
+      */}
       <View className="absolute left-4" style={{ top: topInset + 12 }}>
-        <View className="rounded-full bg-background/95 shadow-md">
-          <BackButton onPress={() => router.back()} color="foreground" />
+        <View className="h-12 w-12 items-center justify-center rounded-full bg-background/95 shadow-md">
+          <BackButton onPress={() => router.back()} color="foreground" edgeAligned={false} />
         </View>
       </View>
 

@@ -9,6 +9,15 @@ export type BackButtonProps = {
    * is no sensible default that reads on both, so it is always explicit.
    */
   color: IconColor;
+  /**
+   * Whether to pull the glyph out to the screen's CONTENT edge.
+   *
+   * True for a chevron at the top of a padded screen, which is every case but
+   * one. Pass false when the button sits in a box of its own — a floating
+   * disc over the map — where there is no content edge to align to and the
+   * negative margin only shoves the glyph off centre. See the docblock.
+   */
+  edgeAligned?: boolean;
   testID?: string;
 };
 
@@ -33,15 +42,28 @@ export type BackButtonProps = {
  * of the window on Android — `(auth)` is a full-screen modal there — and left it
  * half under the status bar and barely tappable. The top inset now comes from
  * `Screen`/`ScreenScrollView`; this only ever adds spacing below it.
+ *
+ * ⚠️ **That negative margin is wrong inside a floating disc, and it looks
+ * like a broken border-radius rather than a margin bug.** With no content
+ * edge to align to it simply drags the 44pt box 12pt left of its parent's own
+ * left edge: the chevron ends up off-centre in the circle, and the parent can
+ * measure 32pt wide instead of 44, so `rounded-full` paints an ELLIPSE. That
+ * is what `edgeAligned={false}` is for — `pick-location.tsx` is the only
+ * caller that needs it, and the three padded-screen call sites depend on the
+ * default staying true.
  */
-export function BackButton({ onPress, color, testID }: BackButtonProps) {
+export function BackButton({ onPress, color, edgeAligned = true, testID }: BackButtonProps) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Go back"
       hitSlop={12}
-      className="-ml-3 h-11 w-11 items-center justify-center"
+      className={
+        edgeAligned
+          ? '-ml-3 h-11 w-11 items-center justify-center'
+          : 'h-11 w-11 items-center justify-center'
+      }
       testID={testID}
     >
       <Icon name="chevron-left" size={24} color={color} />

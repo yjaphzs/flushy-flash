@@ -130,6 +130,16 @@ export type IconColor =
   | 'success'
   | 'field-placeholder'
   | 'accent-foreground'
+  /**
+   * The SECONDARY Button's label colour, for a glyph sitting beside one.
+   *
+   * Not the same green as `accent`: heroui derives this token and
+   * `global.css` overrides it via the app-owned `--accent-soft-fg`, because
+   * uniwind evaluates `color-mix()` in sRGB and the derived value lands too
+   * close to the `--default` fill beneath it (§14). A glyph tinted `accent`
+   * next to a label tinted this reads as two different greens.
+   */
+  | 'accent-soft-foreground'
   | 'on-accent'
   | 'on-brand';
 
