@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import { subscribeToMyNotifications } from '@/features/notifications/api';
 import { ensureAuthors } from '@/features/users/api';
-import { firestoreErrorMessage } from '@/lib/firestore-errors';
+import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useUid } from '@/stores/auth-store';
 import { useNotificationsStore } from '@/stores/notifications-store';
 
@@ -42,7 +42,7 @@ export function useMyNotifications() {
           items.map((i) => i.actorId).filter((id): id is string => id !== null),
         );
       },
-      (e) => setError(firestoreErrorMessage(e)),
+      (e) => setError(firebaseErrorMessage(e)),
     );
 
     return unsubscribe;

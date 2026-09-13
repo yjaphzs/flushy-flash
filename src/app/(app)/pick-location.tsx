@@ -179,12 +179,23 @@ export default function PickLocationScreen() {
         style={{ paddingBottom: bottomClearance, borderCurve: 'continuous' }}
       >
         <View className="gap-1">
+          {/*
+            ⚠️ **"Not near a mapped building" is a claim about the PIN, and with
+            no buildings loaded it is a claim about the wrong thing.** A cold
+            cache with no signal leaves `buildings` empty, so `snapBuilding`
+            returns null for every point on campus and the footer told the user
+            their pin was in a field — for every pin, including one dropped on
+            the library steps. The building label is a nicety here anyway: the
+            pin is the source of truth for where, and `buildingId` is nullable.
+          */}
           <Text type="body" weight="semibold" className={valid ? undefined : 'text-danger'}>
             {!valid
               ? 'That spot is outside campus.'
               : building
                 ? `Looks like ${building.name}.`
-                : 'Not near a mapped building.'}
+                : buildings.length === 0
+                  ? 'Building names are unavailable right now.'
+                  : 'Not near a mapped building.'}
           </Text>
           <Text type="body-xs" color="muted">
             Drag the map to put the pin on the entrance.

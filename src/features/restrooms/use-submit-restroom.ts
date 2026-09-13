@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { createRestroom, newRestroomId } from '@/features/restrooms/api';
 import { pickPhotos, MAX_PHOTOS, type PickedPhoto } from '@/features/restrooms/photos';
 import { deletePhotos, uploadPhoto } from '@/lib/storage';
-import { firestoreErrorMessage } from '@/lib/firestore-errors';
+import { firebaseErrorMessage, type FirebaseOp } from '@/lib/firebase-errors';
 import type { LatLng } from '@/lib/campus';
 import type { Amenities, GenderedAs } from '@/lib/types';
 
@@ -56,6 +56,11 @@ export function useSubmitRestroom() {
     setError(null);
     const id = newRestroomId();
     const uploaded: string[] = [];
+    // Which half failed. One try block covers an upload loop and a document
+    // write, and a Storage failure reported in Firestore's voice — "Could not
+    // load campus data", after ten minutes of "Uploading photo 1 of 3…" — was
+    // the single most misleading message in the app.
+    let phase: FirebaseOp = 'upload';
 
     try {
       for (const [index, photo] of input.photos.entries()) {
@@ -70,6 +75,7 @@ export function useSubmitRestroom() {
         uploaded.push(path);
       }
 
+      phase = 'save';
       setProgress('Saving…');
       await createRestroom({
         id,
@@ -87,7 +93,7 @@ export function useSubmitRestroom() {
       // See the ordering note above: the document is what makes the photos
       // reachable, so if it never landed the photos must go.
       if (uploaded.length > 0) await deletePhotos(uploaded);
-      setError(firestoreErrorMessage(e));
+      setError(firebaseErrorMessage(e, phase));
       return null;
     } finally {
       setBusy(false);

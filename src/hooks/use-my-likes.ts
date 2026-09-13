@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 import { subscribeToMyLikes } from '@/features/likes/api';
-import { firestoreErrorMessage } from '@/lib/firestore-errors';
+import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useUid } from '@/stores/auth-store';
 import { useLikesStore } from '@/stores/likes-store';
 
@@ -31,7 +31,7 @@ export function useMyLikes() {
     const unsubscribe = subscribeToMyLikes(
       uid,
       (likes) => setLiked(likes.map((like) => like.restroomId)),
-      (e) => setError(firestoreErrorMessage(e)),
+      (e) => setError(firebaseErrorMessage(e)),
     );
 
     return unsubscribe;

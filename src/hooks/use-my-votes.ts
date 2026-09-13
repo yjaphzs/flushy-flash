@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
 import { subscribeToMyVotes } from '@/features/restrooms/votes-api';
-import { firestoreErrorMessage } from '@/lib/firestore-errors';
+import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useUid } from '@/stores/auth-store';
 import { useVotesStore } from '@/stores/votes-store';
 
@@ -27,7 +27,7 @@ export function useMyVotes() {
     const unsubscribe = subscribeToMyVotes(
       uid,
       (votes) => setVotes(Object.fromEntries(votes.map((v) => [v.restroomId, v.kind]))),
-      (e) => setError(firestoreErrorMessage(e)),
+      (e) => setError(firebaseErrorMessage(e)),
     );
 
     return unsubscribe;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { forgetUrl, persistedUrls, rememberUrl } from '@/lib/photo-url-cache';
 import { photoUrl } from '@/lib/storage';
 
 /**
@@ -14,18 +15,33 @@ import { photoUrl } from '@/lib/storage';
  * Cached forever rather than with a TTL. Storage objects here are immutable by
  * rule (`allow update: if false`), so a path's bytes can never change — only be
  * deleted, which invalidates the whole entry anyway.
+ *
+ * ⚠️ **The memo now SURVIVES the process, and that is what makes photos work
+ * offline.** In memory alone it did not: expo-image caches image BYTES on disk
+ * keyed by URL, so on a cold start with no connection the URL could never be
+ * obtained and its own cache was addressable but unreachable — every photo in
+ * the app fell back to a glyph while the pixels sat in local storage. See
+ * `photo-url-cache.ts` for why a download URL is safe to keep.
  */
-const cache = new Map<string, Promise<string>>();
+const cache = new Map<string, Promise<string>>(
+  Object.entries(persistedUrls()).map(([path, url]) => [path, Promise.resolve(url)]),
+);
 
 function resolve(path: string): Promise<string> {
   const hit = cache.get(path);
   if (hit) return hit;
-  // Failures are evicted so a transient offline error does not poison the entry
-  // for the life of the process.
-  const pending = photoUrl(path).catch((e: unknown) => {
-    cache.delete(path);
-    throw e;
-  });
+  const pending = photoUrl(path)
+    .then((url) => {
+      rememberUrl(path, url);
+      return url;
+    })
+    // Failures are evicted so a transient offline error does not poison the
+    // entry for the life of the process — or, now, past it.
+    .catch((e: unknown) => {
+      cache.delete(path);
+      forgetUrl(path);
+      throw e;
+    });
   cache.set(path, pending);
   return pending;
 }

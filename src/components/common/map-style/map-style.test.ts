@@ -1,6 +1,6 @@
 import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec';
 
-import { DARK_MAP_STYLE, LIGHT_MAP_STYLE } from '@/components/common/map-style';
+import { DARK_MAP_STYLE, LIGHT_MAP_STYLE, tilePackStyle } from '@/components/common/map-style';
 import { DARK, LIGHT } from '@/components/common/map-style/palette';
 
 /**
@@ -18,6 +18,9 @@ describe('map style', () => {
   it.each([
     ['light', LIGHT_MAP_STYLE],
     ['dark', DARK_MAP_STYLE],
+    // Handed to OfflineManager.createPack as a style URL, where an invalid
+    // style produces an empty download rather than an error.
+    ['offline tile pack', tilePackStyle()],
   ])('%s validates against the MapLibre style spec', (_name, style) => {
     const errors = validateStyleMin(style).map((e) => `${e.message} (${e.identifier ?? '—'})`);
     expect(errors).toEqual([]);
@@ -56,5 +59,41 @@ describe('map style', () => {
     const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
     const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
     expect(luminance).toBeLessThanOrEqual(0.014);
+  });
+});
+
+/**
+ * The offline pack's economics, pinned.
+ *
+ * MapLibre's offline downloader requests every glyph range of every fontstack a
+ * style names — 256 ranges each, ~93 KB apiece on OpenFreeMap — while the whole
+ * of CLSU is about four vector tiles, because the planet TileJSON caps at
+ * `maxzoom: 14`. Putting `glyphs` back would turn a sub-megabyte download into
+ * forty-odd megabytes of type, silently, with nothing else failing.
+ */
+describe('offline tile pack style', () => {
+  it('names no fonts at all', () => {
+    const style = tilePackStyle();
+    expect(style.glyphs).toBeUndefined();
+    expect(style.sprite).toBeUndefined();
+    expect(style.layers.some((layer) => layer.type === 'symbol')).toBe(false);
+  });
+
+  it('keeps the vector source, and every layer that pulls tiles from it', () => {
+    const style = tilePackStyle();
+    expect(style.sources.openmaptiles).toEqual({
+      type: 'vector',
+      url: 'https://tiles.openfreemap.org/planet',
+    });
+    expect(style.layers.length).toBeGreaterThan(0);
+    for (const layer of style.layers) {
+      if (layer.type === 'background') continue;
+      expect(layer.source).toBe('openmaptiles');
+    }
+  });
+
+  it('drops the symbol layers and nothing else', () => {
+    const expected = LIGHT_MAP_STYLE.layers.filter((l) => l.type !== 'symbol').map((l) => l.id);
+    expect(tilePackStyle().layers.map((l) => l.id)).toEqual(expected);
   });
 });

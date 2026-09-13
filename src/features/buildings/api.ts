@@ -14,10 +14,13 @@ import type { Building } from '@/lib/types';
 export function subscribeToBuildings(
   onChange: (buildings: Building[]) => void,
   onError: (error: Error) => void,
+  onMeta?: (fromCache: boolean) => void,
 ) {
   return onSnapshot(
     query(collection(db, COLLECTIONS.buildings), orderBy('name')),
+    { includeMetadataChanges: true },
     (snap) => {
+      onMeta?.(snap.metadata.fromCache);
       onChange(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Building));
     },
     onError,

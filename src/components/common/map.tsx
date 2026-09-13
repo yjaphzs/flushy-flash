@@ -14,6 +14,7 @@ import {
   type ViewStateChangeEvent,
 } from '@maplibre/maplibre-react-native';
 
+import { reserveAmbientCache } from '@/components/common/offline-map';
 import { CAMPUS_BOUNDS, CAMPUS_CENTER, INITIAL_ZOOM, MAX_ZOOM, MIN_ZOOM, MAP_STYLE_URL } from '@/lib/campus';
 
 /**
@@ -41,6 +42,18 @@ MLLogManager.onLog(({ level, tag, message }) => {
   console.warn(`MapLibre Native [WARN] [${tag}] ${message} (transient, retrying)`);
   return true;
 });
+
+/**
+ * Module scope, like the log handler above, and for the same reason: it must
+ * take effect before the first tile request, not on a component's first render.
+ *
+ * MapLibre caches every resource it fetches — tiles, glyphs, the sprite, the
+ * TileJSON — and serves them back with no network. That is what makes the map
+ * survive going offline after ordinary use, and it is where the LABELS come
+ * from: the downloadable pack in `offline-map.ts` carries tiles only, because
+ * packing fonts costs ~50x what packing this campus's tiles does.
+ */
+void reserveAmbientCache().catch(() => {});
 
 /**
  * The single place MapLibre's API surface is named.

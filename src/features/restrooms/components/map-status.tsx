@@ -12,6 +12,7 @@ import {
   useCampusStore,
   useRestrooms,
 } from '@/stores/campus-store';
+import { useIsOnline } from '@/stores/connection-store';
 import { useMapFocusStore, useNearestLabel, useNearestOutcome } from '@/stores/map-focus-store';
 
 /**
@@ -27,16 +28,25 @@ import { useMapFocusStore, useNearestLabel, useNearestOutcome } from '@/stores/m
 const OVER_MAP = 'bg-background shadow-md';
 
 /**
- * Three genuinely different states that all used to look like an empty map.
+ * Four genuinely different states that all used to look like an empty map.
  *
  * Deliberately NOT auto-dismissed, unlike the nearest-search banners below.
- * These describe what the map IS — still loading, failed to load, empty — rather
- * than reporting an event that has finished. "No restrooms yet" stops being true
- * the moment someone adds one, and it should disappear then, not on a timer.
+ * These describe what the map IS — still loading, failed to load, offline,
+ * empty — rather than reporting an event that has finished. "No restrooms yet"
+ * stops being true the moment someone adds one, and it should disappear then,
+ * not on a timer.
+ *
+ * ⚠️ **Offline is checked BEFORE either empty branch, and that ordering is the
+ * whole point of it.** A first launch with no signal reaches
+ * `restrooms.length === 0` through Firestore's empty disk cache, not through an
+ * error — so the old copy told a student standing on a campus full of toilets
+ * that there were none, and invited them to add the first one, which offline
+ * they also cannot do.
  */
 export function CampusStatus() {
   const loading = useCampusLoading();
   const error = useCampusError();
+  const online = useIsOnline();
   const buildings = useBuildings();
   const restrooms = useRestrooms();
 
@@ -62,6 +72,20 @@ export function CampusStatus() {
             <Button.Label>Try again</Button.Label>
           </Button>
         </View>
+      </Callout>
+    );
+  }
+
+  // Stays up for as long as it is true — this one IS the state of the map, and
+  // a stale cache the user cannot tell from live data is the thing to avoid.
+  if (!online) {
+    return (
+      <Callout tone="info" icon="wifi-off" className={OVER_MAP} testID="campus-offline">
+        <Text type="body-sm">
+          {restrooms.length === 0
+            ? "You're offline, and no restrooms are saved on this phone yet. The map fills in once you reconnect."
+            : "You're offline. Showing what was saved on this phone."}
+        </Text>
       </Callout>
     );
   }

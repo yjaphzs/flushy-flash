@@ -12,6 +12,7 @@ import { refreshClaims, resendVerification } from '@/features/auth/api';
 import { authErrorMessage } from '@/features/auth/errors';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { useAuthStatus, useAuthStore, useIsVerifiedStudent } from '@/stores/auth-store';
+import { OfflineMapRow } from '@/features/offline-map/components/offline-map-row';
 import { UpdateRow } from '@/features/updates/components/update-row';
 import { DeleteAccountRow } from '@/features/auth/components/delete-account-row';
 
@@ -145,6 +146,7 @@ export default function SettingsScreen() {
       <View className="gap-2">
         <Text type="h4">This device</Text>
         <ActionGroup>
+          <OfflineMapRow />
           <UpdateRow />
         </ActionGroup>
       </View>
