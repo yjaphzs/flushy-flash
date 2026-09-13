@@ -39,12 +39,22 @@ service cloud.firestore {
     }
 
     // The verified-student badge is derived from the token itself, never from a
-    // field the client controls. Email must be verified AND on the CLSU domain.
+    // field the client controls. Email must be verified AND on a CLSU domain.
+    //
+    // TWO domains: clsu.edu.ph and clsu2.edu.ph. Mirrored by CLSU_EMAIL_DOMAINS
+    // in src/lib/campus.ts, and there is no import across that boundary - so the
+    // two move together or not at all. A one-domain drift is not a wrong badge:
+    // this function is the equality target of THREE rules below (restroomVotes
+    // create, users create and update), so it breaks PROFILE CREATION with a bare
+    // permission-denied.
+    //
+    // The dots stay escaped as [.] character classes rather than backslashes, and
+    // .lower() is applied first, so casing needs no handling here.
     function isVerifiedStudent() {
       return isSignedIn()
         && request.auth.token.email_verified == true
         && request.auth.token.email is string
-        && request.auth.token.email.lower().matches('^[^@]+@clsu[.]edu[.]ph$');
+        && request.auth.token.email.lower().matches('^[^@]+@clsu2?[.]edu[.]ph$');
     }
 
     // Signing in is no longer enough to write. Guests browse freely, and an

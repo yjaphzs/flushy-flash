@@ -9,13 +9,12 @@ import { LabeledSeparator } from '@/components/ui/separator';
 import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
-import { CampusDomain } from '@/components/common/email-text';
 import { AuthScreen } from '@/features/auth/components/auth-screen';
 import { GoogleButton } from '@/features/auth/components/google-button';
 import { isGoogleSignInConfigured } from '@/features/auth/google';
 import { PasswordStrength } from '@/features/auth/components/password-strength';
 import { useSignUpForm } from '@/features/auth/use-sign-up-form';
-import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
+import { CLSU_PRIMARY_DOMAIN } from '@/lib/campus';
 
 /**
  * Credentials only. The display name and @handle are asked for after the address
@@ -33,7 +32,7 @@ export default function SignUpScreen() {
       title="Create your account"
       subtitle={
         <>
-          Anyone can join. Verify a <CampusDomain /> address to get the student badge.
+          Anyone can join. Verify a CLSU address to get the student badge.
         </>
       }
       onBack={router.canGoBack() ? () => router.back() : undefined}
@@ -53,7 +52,7 @@ export default function SignUpScreen() {
             onChangeText={form.setEmail}
             onBlur={() => form.touch('email')}
             leading="mail"
-            placeholder={`you@${CLSU_EMAIL_DOMAIN}`}
+            placeholder={`you@${CLSU_PRIMARY_DOMAIN}`}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}

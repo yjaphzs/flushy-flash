@@ -309,8 +309,32 @@ Invariants the rules enforce — **preserve these when editing `firestore.rules`
 against the attack matrix in the README before real users. If you touch them, that
 becomes more urgent, not less.
 
-Email domain (`clsu.edu.ph`) is **unconfirmed** — one constant in
-`src/lib/campus.ts` plus one regex in `firestore.rules`.
+**Campus email is TWO domains** — `clsu.edu.ph` and `clsu2.edu.ph` — and both
+are still **unconfirmed** with CLSU.
+
+⚠️ **This used to say "one constant plus one regex", and that was already**
+**wrong.** There are exactly two places the predicate LIVES:
+
+- `CLSU_EMAIL_DOMAINS` + `isCampusEmail()` in `src/lib/campus.ts`
+- the regex in `isVerifiedStudent()` in `firestore.rules`
+
+The client side used to be three copies of `.endsWith(`@${DOMAIN}`)` —
+`tokenVerifiedStudent`, `tokenVoteWeight` and `useIsVerifiedStudent` — which is
+three places to miss one. They now all call `isCampusEmail`.
+
+⚠️ **`endsWith` was never the same predicate as the rules regex.** It accepts
+`@clsu.edu.ph` with no local part, where the rules require `[^@]+` first; and a
+pattern built from the list must ESCAPE the dots or `clsuXedu.ph` matches.
+`src/lib/campus.test.ts` pins both, and `rules/firestore.test.ts` pins the same
+cases server-side.
+
+⚠️ **A drift between the two is not a wrong badge.** `isVerifiedStudent()` is
+the equality target of three rules — `restroomVotes` create, `users` create and
+update — so a missing domain is a bare `permission-denied` that breaks PROFILE
+CREATION. `syncVerifiedStudent()` in `features/auth/api.ts` is the repair for
+accounts created while a domain was unrecognised: the rules pin the stored field
+to the token, and `createProfile` is otherwise the only writer, so without it a
+widened domain leaves those profiles permanently stuck.
 
 ---
 

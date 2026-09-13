@@ -8,10 +8,16 @@ import {
   updateProfile,
 } from '@react-native-firebase/auth';
 import type { User } from '@react-native-firebase/auth';
-import { doc, getDoc, serverTimestamp, writeBatch } from '@react-native-firebase/firestore';
+import {
+  doc,
+  getDoc,
+  serverTimestamp,
+  updateDoc,
+  writeBatch,
+} from '@react-native-firebase/firestore';
 
 import { signOutGoogle } from '@/features/auth/google';
-import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
+import { isCampusEmail } from '@/lib/campus';
 import { db, COLLECTIONS } from '@/lib/firebase';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -58,7 +64,7 @@ export function signIn(email: string, password: string) {
 async function tokenVerifiedStudent(user: User): Promise<boolean> {
   const { claims } = await user.getIdTokenResult();
   const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : '';
-  return claims.email_verified === true && email.endsWith(`@${CLSU_EMAIL_DOMAIN}`);
+  return claims.email_verified === true && isCampusEmail(email);
 }
 
 /**
@@ -86,8 +92,7 @@ export async function tokenVoteWeight(): Promise<{ byStudent: boolean; byAdmin: 
   const { claims } = await user.getIdTokenResult();
   const email = typeof claims.email === 'string' ? claims.email.toLowerCase() : '';
   return {
-    byStudent:
-      claims.email_verified === true && email.endsWith(`@${CLSU_EMAIL_DOMAIN}`),
+    byStudent: claims.email_verified === true && isCampusEmail(email),
     byAdmin: claims.admin === true,
   };
 }
@@ -205,7 +210,43 @@ export async function refreshClaims(): Promise<boolean> {
 
   const fresh = getAuth().currentUser;
   if (fresh) useAuthStore.getState().setUser(fresh);
+
+  // Best-effort, and never allowed to fail the refresh: the caller asked
+  // whether the address is confirmed, not to repair a document.
+  if (fresh) await syncVerifiedStudent(fresh).catch(() => {});
+
   return fresh?.emailVerified ?? false;
+}
+
+/**
+ * Brings the stored `verifiedStudent` back into line with the token.
+ *
+ * ⚠️ **Without this, widening the set of campus domains is a one-way trap.**
+ * `firestore.rules` requires `verifiedStudent == isVerifiedStudent()` on every
+ * profile update, and `createProfile` is the only writer of the field. So a
+ * student whose domain was not recognised when they signed up holds `false`
+ * against a token that now derives `true` — their badge never appears on their
+ * reviews, and the moment any profile-edit path exists it is rejected outright,
+ * with no way to fix it from the client.
+ *
+ * It reads before it writes and writes only on a genuine mismatch, so the
+ * common case costs one document read and nothing else. Same direction of
+ * repair works if a domain is ever REMOVED.
+ *
+ * Hung off `refreshClaims` because that is the one place the token is known to
+ * be fresh — comparing against a stale token would write the wrong value and
+ * the rules would reject it.
+ */
+export async function syncVerifiedStudent(user: User): Promise<void> {
+  const ref = doc(db, COLLECTIONS.users, user.uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+
+  const current = snap.data()?.verifiedStudent === true;
+  const actual = await tokenVerifiedStudent(user);
+  if (current === actual) return;
+
+  await updateDoc(ref, { verifiedStudent: actual });
 }
 
 export function resetPassword(email: string) {

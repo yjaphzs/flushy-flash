@@ -1,4 +1,3 @@
-import { CampusDomain } from '@/components/common/email-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
@@ -23,11 +22,7 @@ const BENEFITS: Benefit[] = [
   {
     icon: 'badge-check',
     title: 'Student badge',
-    detail: (
-      <>
-        A <CampusDomain /> address unlocks editing shared entries.
-      </>
-    ),
+    detail: 'A CLSU address unlocks editing shared entries.',
   },
 ];
 

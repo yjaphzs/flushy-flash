@@ -134,6 +134,7 @@ export type IconColor =
   | 'accent'
   | 'danger'
   | 'success'
+  | 'warning'
   | 'field-placeholder'
   | 'accent-foreground'
   /**

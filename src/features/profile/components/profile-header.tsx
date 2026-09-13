@@ -122,7 +122,14 @@ export function ProfileHeader({ displayName, handle, email, photoURL }: ProfileH
         ) : null}
       </View>
 
-      <View className="mt-3">
+      {/*
+        ⚠️ The horizontal padding is the fix, not decoration. The header has no
+        padding of its own, so the badge's description line ran to both screen
+        edges while the chip above it sat centred — which reads as a broken
+        layout rather than a caption. `max-w-sm` keeps the line from stretching
+        to a comfortless width on a tablet.
+      */}
+      <View className="mt-3 w-full max-w-sm items-center px-8">
         <StudentBadge />
       </View>
     </View>

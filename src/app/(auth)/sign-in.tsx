@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { AuthScreen } from '@/features/auth/components/auth-screen';
-import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
+import { CLSU_PRIMARY_DOMAIN } from '@/lib/campus';
 import { GoogleButton } from '@/features/auth/components/google-button';
 import { isGoogleSignInConfigured } from '@/features/auth/google';
 import { useSignInForm } from '@/features/auth/use-sign-in-form';
@@ -40,7 +40,7 @@ export default function SignInScreen() {
             onChangeText={form.setEmail}
             onBlur={() => form.touch('email')}
             leading="mail"
-            placeholder={`you@${CLSU_EMAIL_DOMAIN}`}
+            placeholder={`you@${CLSU_PRIMARY_DOMAIN}`}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}

@@ -1,5 +1,5 @@
 import { Text, type TextProps } from '@/components/ui/text';
-import { CLSU_EMAIL_DOMAIN } from '@/lib/campus';
+import { CLSU_EMAIL_DOMAINS, CLSU_PRIMARY_DOMAIN } from '@/lib/campus';
 
 /**
  * Email addresses and the campus domain, tinted.
@@ -48,17 +48,38 @@ export function EmailAddress({
 }
 
 /**
- * The campus domain as people write it: `@clsu.edu.ph`.
+ * ONE campus domain as people write it: `@clsu.edu.ph`.
  *
  * The `@` is rendered HERE, inside the tinted run, rather than left to the call
- * site. `CLSU_EMAIL_DOMAIN` is the bare domain, so every existing site writes
- * its own sigil — and tinting only the domain would leave a grey `@` welded to a
- * green address.
+ * site: the constants are bare domains, so every call site would write its own
+ * sigil, and tinting only the domain leaves a grey `@` welded to a green
+ * address.
+ *
+ * ⚠️ **This is the PRIMARY domain, not the whole list**, and that is why most
+ * copy no longer names a domain at all. There are two now, and "a
+ * @clsu.edu.ph or @clsu2.edu.ph address" does not survive being dropped into a
+ * sentence — so the sentences say "a CLSU address" and `CampusDomains` lists
+ * them once, on Settings, where the detail belongs.
  */
 export function CampusDomain({ type = 'body-sm', weight, className }: RunProps) {
   return (
     <Text type={type} weight={weight} className={tint(className)}>
-      @{CLSU_EMAIL_DOMAIN}
+      @{CLSU_PRIMARY_DOMAIN}
+    </Text>
+  );
+}
+
+/**
+ * Every campus domain, joined for prose: `@clsu.edu.ph or @clsu2.edu.ph`.
+ *
+ * Deliberately NOT a drop-in for `CampusDomain` — it reads as a list and only
+ * fits where a list is expected. Built from the constant rather than written
+ * out, so adding a third domain does not leave a stale sentence behind.
+ */
+export function CampusDomains({ type = 'body-sm', weight, className }: RunProps) {
+  return (
+    <Text type={type} weight={weight} className={tint(className)}>
+      {CLSU_EMAIL_DOMAINS.map((d) => `@${d}`).join(' or ')}
     </Text>
   );
 }

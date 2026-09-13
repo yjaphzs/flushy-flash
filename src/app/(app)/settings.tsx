@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { router } from 'expo-router';
 
 import { ActionGroup, ActionRow } from '@/components/common/action-row';
-import { CampusDomain, EmailAddress } from '@/components/common/email-text';
+import { CampusDomains, EmailAddress } from '@/components/common/email-text';
 import { Callout } from '@/components/feedback/callout';
 import { FormScreen } from '@/components/layouts/form-screen';
 import { Button } from '@/components/ui/button';
@@ -92,8 +92,8 @@ export default function SettingsScreen() {
             hint={
               isGuest ? (
                 <>
-                  Students with a <CampusDomain type="body-xs" /> address get a badge, and can
-                  edit shared entries.
+                  Students with a <CampusDomains type="body-xs" /> address get a badge,
+                  and can edit shared entries.
                 </>
               ) : verifiedStudent && email ? (
                 <>
@@ -101,8 +101,8 @@ export default function SettingsScreen() {
                 </>
               ) : emailVerified && email ? (
                 <>
-                  <EmailAddress email={email} type="body-xs" /> is verified, but it is not a{' '}
-                  <CampusDomain type="body-xs" /> address.
+                  <EmailAddress email={email} type="body-xs" /> is verified, but it is not
+                  a <CampusDomains type="body-xs" /> address.
                 </>
               ) : (
                 <>

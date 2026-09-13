@@ -1,60 +1,62 @@
 import { Chip } from '@/components/ui/chip';
-import { CampusDomain } from '@/components/common/email-text';
+import { Icon } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
-import { useAuthStore, useIsVerifiedStudent } from '@/stores/auth-store';
+import { isCampusEmail } from '@/lib/campus';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
- * The student badge, and the copy under it.
+ * Which kind of account this is, and — separately — whether it is finished.
  *
- * THREE states, not two. An earlier version collapsed them into one word,
- * "Unverified", which reads as "your email is not confirmed" — and for a Google
- * account that is simply false: the address IS verified, it just is not a CLSU
- * one. The badge was never about email confirmation;
- * `useIsVerifiedStudent()` is `emailVerified && endsWith(@clsu.edu.ph)`, and
- * only the second conjunct fails there.
+ * ## Two badges, not three
  *
- * settings.tsx has said the honest thing all along. This is that same three-way
- * split, on the screen people actually look at.
+ * The badge answers exactly one question: is this a campus address or not.
+ * `CLSU student` / `Outsider`, by domain alone.
+ *
+ * ⚠️ **That is deliberately NOT the same question as "can this account do
+ * things".** The powers come from `isVerifiedStudent()` in firestore.rules,
+ * which is the domain AND a confirmed email — so a CLSU address that has never
+ * been confirmed gets the badge here while being refused by the server.
+ *
+ * Rather than fold that back into a third badge, the unconfirmed case gets its
+ * own line underneath. It is the only one of the states with something to DO,
+ * and burying an action inside a label is how it stops being noticed. An
+ * earlier version made the opposite mistake in the other direction: one word,
+ * "Unverified", which read as "your email is not confirmed" and was simply
+ * false for a Google account whose address is verified and merely not CLSU.
+ *
+ * The domain is read from the STORE rather than the token, unlike the writes in
+ * `auth/api.ts`. This is a label; being a second behind a token rotation costs
+ * nothing, whereas a rejected write costs the whole profile create.
  */
 export function StudentBadge() {
-  const verified = useIsVerifiedStudent();
+  const email = useAuthStore((s) => s.email);
   const emailVerified = useAuthStore((s) => s.emailVerified);
+  const campus = isCampusEmail(email);
 
-  if (verified) {
-    return (
-      <Chip color="success">
-        <Chip.Label>Verified CLSU student</Chip.Label>
-      </Chip>
-    );
-  }
-
-  // Confirmed address, wrong domain. NEUTRAL, deliberately: this is not a
-  // problem the person can be said to have — most students signing in with a
-  // personal Google account land here — so it gets no warning colour and no
-  // word implying something failed.
-  if (emailVerified) {
-    return (
-      <View className="items-center gap-2">
-        <Chip color="default" variant="soft">
-          <Chip.Label>Not a student account</Chip.Label>
-        </Chip>
-        <Text type="body-xs" color="muted" align="center">
-          A <CampusDomain type="body-xs" /> address unlocks editing shared entries.
-        </Text>
-      </View>
-    );
-  }
-
-  // Genuinely unconfirmed — the only one of the three with something to do.
   return (
     <View className="items-center gap-2">
-      <Chip color="warning" variant="soft">
-        <Chip.Label>Email not confirmed</Chip.Label>
-      </Chip>
-      <Text type="body-xs" color="muted" align="center">
-        Confirm your address to review and edit entries.
-      </Text>
+      {campus ? (
+        <Chip color="success" variant="soft">
+          <Chip.Label>CLSU student</Chip.Label>
+        </Chip>
+      ) : (
+        // NEUTRAL, deliberately: not being a student is not a problem the person
+        // can be said to have, and most people signing in with a personal Google
+        // account land here. No warning colour, no word implying something failed.
+        <Chip color="default" variant="soft">
+          <Chip.Label>Outsider</Chip.Label>
+        </Chip>
+      )}
+
+      {!emailVerified ? (
+        <View className="flex-row items-center gap-1.5">
+          <Icon name="alert-circle" size={14} color="warning" />
+          <Text type="body-xs" color="muted">
+            Confirm your email to review and edit.
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
