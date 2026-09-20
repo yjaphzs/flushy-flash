@@ -320,11 +320,21 @@ Invariants the rules enforce — **preserve these when editing `firestore.rules`
   building. When present it must exist — a dangling id renders as "Unknown
   building" forever.
 - **Photos are `photoIds`, never `photoCount`.** `photoIds` is a client-written
-  list of Storage object PATHS (not download URLs, which expire), capped at 6.
-  `photoCount` stays an aggregate: pinned to 0 at create, `unchanged` on update,
-  and the delete rule keys off `photoCount == 0` — making it writable would let
-  an author delete a restroom other people had photographed. Anything showing a
-  count reads `photoIds.length` until a Cloud Function exists.
+  list of Storage object PATHS (not download URLs, which expire), capped at
+  **FIVE** — `isValidPhotoIds()` in the rules is the enforcing copy, mirrored by
+  `MAX_PHOTOS`. ⚠️ This said 6 for a long time and never was.
+  `photoCount` stays an aggregate: pinned to 0 at create, `unchanged` on update.
+  ⚠️ **The delete rule no longer keys off it** — it keys off `ratingCount == 0`
+  and `confirmCount == 0`, which is the same protection expressed against the
+  thing that actually measures whether anyone else has invested in the entry.
+  Anything showing a count reads `photoIds.length`.
+
+  **At least one photo is required on a NEW restroom**, enforced in `submit.tsx`
+  only. The rules clause is deliberately held back a release: rules deploy on
+  merge to main and the APK ships on a tag, so tightening it early refuses
+  submissions from every phone that has not updated. When it lands it goes on
+  `allow create` ONLY — on update it would make every restroom currently holding
+  `photoIds: []` permanently uneditable.
 - **Aggregates are never client-writable.** `ratingSum`, `ratingCount`,
   `photoCount` and the social counters reject client writes. Ratings are read live
   via `getAggregateFromServer` (`src/features/restrooms/api.ts`) wherever a live
@@ -848,11 +858,10 @@ somewhere nobody asked to go. `map-focus-store.test.ts` covers it.
 **A pin shows the restroom's own first photo**, and tapping it opens a bottom
 sheet rather than navigating — the map stays behind it, which is the point.
 `/restroom/[id]` survives for deep links, notification taps and the full review
-list. ⚠️ **They were supposed to share `restroom-detail.tsx` so they could not
-drift — and they already have.** `/restroom/[id]` imports none of those components
-and hand-rolls its own title, rating card and amenity chips; it renders no photos at
-all. Extracting a shared `restroom-summary.tsx` is outstanding work, not a
-description of the code.
+list. They were supposed to share `restroom-detail.tsx` so they could not drift,
+and for a while they had — **that is repaired**: `RestroomDetailHeader` renders
+`RestroomHero` + `PhotoStrip` and imports `StatusChip` / `AccessChip` / `StatRow`
+/ `AmenityGrid` from the shared file.
 
 Storage paths, not download URLs, are what the document stores — a URL carries a
 token and goes stale. `use-photo-url.ts` resolves them and memoises **by path,
@@ -1080,8 +1089,8 @@ explicitly, because a working map with no pins is indistinguishable from a broke
 one.
 
 **Photos** go through `src/features/restrooms/photos.ts` (pick + resize to a
-1600px longest edge, re-encoded as JPEG, which also strips the EXIF GPS of
-whoever took it) and `src/lib/storage.ts` (upload). The submit order is **reserve
+1600px longest edge, re-encoded as **WebP at 0.9** — see §4 for why not JPEG or
+PNG — which also strips the EXIF GPS of whoever took it) and `src/lib/storage.ts` (upload). The submit order is **reserve
 id → upload photos → write the document**, because the object path contains the
 id. A failure after upload orphans bytes, which are deleted best-effort; the
 opposite ordering would leave `photoIds` pointing at objects that never existed,
@@ -1115,7 +1124,23 @@ The **PNG exports listed in `assets/brand/README.md` are still outstanding**, so
 longer references an image. Those need `npm run prebuild:android` after they
 land, and so does the splash colour change already made.
 
-Not yet done: photo upload to Storage and RTDB live status.
+**A restroom is editable by its author**, via `/edit-restroom` and
+`use-restroom-form.ts`, which serves the add and edit screens both. This needed
+**no rules change at all**: the update rule has permitted exactly this field set
+since the trust system landed and the attack matrix already asserted it — the
+client had simply never called it.
+
+⚠️ Two consequences worth keeping in mind:
+
+- **`status` is reachable for the first time.** Out of order / Closed were
+  rendered on the building list and the detail page from the start and settable
+  by nothing, so a toilet that broke stayed marked fine forever.
+- **`verified` is pinned, so it does not follow a moved pin.** An entry two
+  students vouched for at one door keeps their vouches at a different one. The
+  edit screen says so when the pin moves >30 m on a confirmed entry; resetting
+  trust server-side would be a change to the trust system and has not been made.
+
+Not yet done: RTDB live status.
 
 The rules attack matrix now exists and passes (133 cases, `rules/firestore.test.ts`),
 so §7's "written but unproven" caveat is closed. It earned its keep immediately by

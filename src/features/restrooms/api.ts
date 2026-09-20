@@ -195,8 +195,9 @@ export async function createRestroom(input: {
     status: 'ok',
     ratingSum: 0,
     ratingCount: 0,
-    // Stays 0 forever until a Cloud Function exists — the rules pin it and the
-    // delete rule keys off it. Photo counts come from photoIds.length.
+    // Stays 0 forever until a Cloud Function exists — the rules pin it. The
+    // delete rule keys off ratingCount and confirmCount, NOT this. Photo counts
+    // come from photoIds.length.
     photoCount: 0,
     verified: false,
     // All four required to be exactly this at create. Server-written from
