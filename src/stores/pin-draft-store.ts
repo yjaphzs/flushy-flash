@@ -36,6 +36,15 @@ type PinDraftState = {
   /** Bumped ONLY by commit(). Movement is what signals a confirmation. */
   nonce: number;
   commit: (point: LatLng) => void;
+  /**
+   * Positions the placer's camera without registering a confirmation.
+   *
+   * Editing needs this and creating does not: the placer seeds its camera from
+   * `point`, so an edit must put the existing pin there — but `commit()` would
+   * bump the nonce, and the form would read that as the user having just placed
+   * a pin they never touched.
+   */
+  seed: (point: LatLng) => void;
   /** Cleared when the composer unmounts, so a later open starts fresh. */
   reset: () => void;
 };
@@ -44,6 +53,7 @@ export const usePinDraftStore = create<PinDraftState>((set) => ({
   point: null,
   nonce: 0,
   commit: (point) => set((s) => ({ point, nonce: s.nonce + 1 })),
+  seed: (point) => set({ point }),
   reset: () => set({ point: null, nonce: 0 }),
 }));
 
