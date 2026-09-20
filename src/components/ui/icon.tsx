@@ -30,6 +30,7 @@ import Sparkles from 'lucide-react-native/icons/sparkles';
 import Star from 'lucide-react-native/icons/star';
 import User from 'lucide-react-native/icons/user';
 import UserRound from 'lucide-react-native/icons/user-round';
+import Pencil from 'lucide-react-native/icons/pencil';
 import XMark from 'lucide-react-native/icons/x';
 import WifiOff from 'lucide-react-native/icons/wifi-off';
 import { useCSSVariable } from 'uniwind';
@@ -87,6 +88,7 @@ export type IconName =
   | 'image'
   | 'search'
   | 'filter'
+  | 'pencil'
   // Offline. See stores/connection-store.ts for how the app knows.
   | 'wifi-off';
 
@@ -143,6 +145,7 @@ const GLYPHS: Record<IconName, Glyph> = {
   image: ImageIcon,
   search: Search,
   filter: SlidersHorizontal,
+  pencil: Pencil,
   'wifi-off': WifiOff,
 };
 

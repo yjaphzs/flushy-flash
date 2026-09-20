@@ -10,12 +10,13 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
 } from '@react-native-firebase/firestore';
 
 import { COLLECTIONS, db } from '@/lib/firebase';
 import type { LatLng } from '@/lib/campus';
-import type { Amenities, Restroom } from '@/lib/types';
+import type { Amenities, Restroom, RestroomStatus } from '@/lib/types';
 
 /**
  * Full-collection listener — see the note in features/buildings/api.ts.
@@ -102,6 +103,51 @@ export async function fetchRatingSummary(restroomId: string) {
  */
 export function deleteRestroom(restroomId: string) {
   return deleteDoc(doc(db, COLLECTIONS.restrooms, restroomId));
+}
+
+/**
+ * Edits an existing restroom.
+ *
+ * ⚠️ **`updateDoc` of the mutable fields only — NEVER a blind `setDoc`.**
+ * `updateReview`'s docblock makes the same argument and it applies verbatim:
+ * on an update `request.resource.data` is the MERGED document, so the rules'
+ * `unchanged(['ratingSum', 'ratingCount', 'photoCount', 'createdBy',
+ * 'createdAt'])` passes by construction — those five are simply not in the
+ * patch. A `setDoc` re-stamping `createdAt: serverTimestamp()` puts it in
+ * `changedKeys()` and the write is denied, every time.
+ *
+ * Nothing here needs a rules change: `firestore.rules` has permitted the author
+ * to change exactly this set since the trust system landed, and the attack
+ * matrix already asserts it. The client simply never called it — which is why
+ * `status` has been rendered in two places and settable in none.
+ *
+ * `status` is deliberately IN this set. It is the one fact about a restroom
+ * that goes stale on its own, and it had no route in at all.
+ */
+export async function updateRestroom(input: {
+  id: string;
+  point: LatLng;
+  buildingId: string | null;
+  floor: number;
+  landmark: string;
+  locationNote: string;
+  photoIds: string[];
+  amenities: Amenities;
+  status: RestroomStatus;
+}) {
+  await updateDoc(doc(db, COLLECTIONS.restrooms, input.id), {
+    // Same three-orderings note as createRestroom: GeoPoint is (lat, lng),
+    // our domain type is { lat, lng }, MapLibre wants [lng, lat].
+    location: new GeoPoint(input.point.lat, input.point.lng),
+    buildingId: input.buildingId,
+    floor: input.floor,
+    landmark: input.landmark.trim(),
+    locationNote: input.locationNote.trim(),
+    photoIds: input.photoIds,
+    amenities: input.amenities,
+    status: input.status,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export const EMPTY_AMENITIES: Amenities = {
