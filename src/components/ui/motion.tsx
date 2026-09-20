@@ -1,4 +1,6 @@
 import Animated, {
+  interpolate,
+  runOnJS,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -20,7 +22,7 @@ import Animated, {
  * style objects and cannot animate, and Reanimated needs plain numbers on the UI
  * thread. A `--duration-fast` nobody can read would be worse than no token.
  *
- * ## Two rules, both load-bearing
+ * ## Three rules, all load-bearing
  *
  * **Use `.get()` / `.set()`, never `.value`.** `app.json` sets
  * `experiments.reactCompiler: true`, and the compiler cannot reason about a
@@ -30,8 +32,34 @@ import Animated, {
  *
  * **Never read or write a shared value during render.** Reads belong in a
  * worklet (`useAnimatedStyle`), writes in an effect or a handler.
+ *
+ * **Honour `useReducedMotion()` on every animation.** The OS setting is an
+ * accessibility preference, not a hint — set the value directly instead of
+ * animating to it. AGENTS.md §3 has said this all along; this file said "two
+ * rules" and listed only the first two, which is how it gets forgotten.
+ *
+ * ⚠️ **A worklet that closes over a plain prop produces a STEP, not a
+ * transition.** `useAnimatedStyle(() => ({ opacity: selected ? 1 : 0 }))` re-runs
+ * on prop change and snaps. There is no error and it looks exactly like no
+ * animation at all — drive it through a shared value set in an effect.
+ *
+ * ## What is deliberately NOT re-exported
+ *
+ * Everything else Reanimated ships. This list grows only when something needs
+ * it, so that the surface app code can reach stays small enough to reason about.
+ * `runOnJS` and `interpolate` were added for the submit stepper: the first to
+ * commit a swipe from the UI thread, the second for the slide.
  */
-export { Animated, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring, withTiming };
+export {
+  Animated,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+};
 
 /**
  * The house spring. Slightly over-damped: it settles without the wobble that

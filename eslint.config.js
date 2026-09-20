@@ -69,6 +69,16 @@ module.exports = defineConfig([
               name: 'lottie-react-native',
               message: 'Import { Lottie } from @/components/ui/lottie.',
             },
+            {
+              // The last rendering-layer package without a wrapper, and it was
+              // an oversight rather than a decision — every other one has been
+              // behind @/components/ui for a long time. Two traps live in the
+              // wrapper's docblock: a horizontal pan inside a ScrollView steals
+              // the scroll without activeOffsetX, and a gesture callback is a
+              // worklet, so touching React state from it needs runOnJS.
+              name: 'react-native-gesture-handler',
+              message: 'Import { Gesture, GestureDetector } from @/components/ui/gesture.',
+            },
           ],
         },
       ],
