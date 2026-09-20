@@ -60,8 +60,27 @@ export default function SubmitRestroomScreen() {
    */
   const quota = usePendingQuota(uid);
 
+  /**
+   * ⚠️ **At least one photo, which is new.**
+   *
+   * A pin with no picture is the hardest entry to trust and the hardest to
+   * find: the photo IS the "is this the right door" check, and the map pin
+   * renders it rather than a glyph.
+   *
+   * ⚠️ **Enforced here only, deliberately.** The matching `firestore.rules`
+   * clause is held back a release because the two do not ship together — rules
+   * deploy on merge to main, the APK on a tag — so adding it today would start
+   * refusing submissions from every phone that has not updated yet, with a bare
+   * permission-denied naming nothing. When it does land it must go on
+   * `allow create` ONLY: on update it would make every restroom currently
+   * holding `photoIds: []` permanently uneditable.
+   */
   const ready =
-    Boolean(fields.point) && fields.landmark.trim().length > 0 && !form.busy && !quota.full;
+    Boolean(fields.point) &&
+    fields.landmark.trim().length > 0 &&
+    fields.photos.length > 0 &&
+    !form.busy &&
+    !quota.full;
 
   return (
     <FormScreen
@@ -91,6 +110,7 @@ export default function SubmitRestroomScreen() {
         onChange={fields.setPhotos}
         max={form.maxPhotos}
         pick={form.pickPhotos}
+        hint="At least one, so people can tell they have found the right door."
       />
 
       <AccessChips value={fields.genderedAs} onChange={fields.setGenderedAs} />

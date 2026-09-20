@@ -58,8 +58,12 @@ export type Restroom = {
   /** "Near the east stairwell" — how people actually find it indoors. */
   locationNote: string;
   /**
-   * Storage object paths under `restrooms/{id}/`, max 6 — NOT download URLs,
+   * Storage object paths under `restrooms/{id}/`, max FIVE — NOT download URLs,
    * which expire and would bloat the document.
+   *
+   * ⚠️ This said "max 6" for a long time and never was: `isValidPhotoIds()` in
+   * firestore.rules is the enforcing copy and has always been 5, mirrored by
+   * `MAX_PHOTOS` in features/restrooms/photos.ts.
    *
    * Deliberately a client-written list rather than the `photoCount` beside it:
    * that aggregate is pinned to 0 by the rules and can only ever be moved by a

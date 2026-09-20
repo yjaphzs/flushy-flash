@@ -15,6 +15,15 @@ export type PhotoPickerProps = {
   onChange: (photos: ComposerPhoto[]) => void;
   max: number;
   pick: (remaining: number) => Promise<PickedPhoto[]>;
+  /**
+   * Replaces the standing "the entrance is the most useful one" line.
+   *
+   * Exists because a photo is REQUIRED on a new restroom now, and a disabled
+   * Save button with the reason three sections further down is the shape
+   * `callout.tsx` was written to end. The demand belongs beside the control
+   * that satisfies it.
+   */
+  hint?: string;
 };
 
 /** Stable identity for a photo of either kind, for keys and removal. */
@@ -56,7 +65,7 @@ function Thumb({ photo, index }: { photo: ComposerPhoto; index: number }) {
  * is what makes removing a photo free, and what stops a user who abandons the
  * form halfway from leaving objects in the bucket.
  */
-export function PhotoPicker({ photos, onChange, max, pick }: PhotoPickerProps) {
+export function PhotoPicker({ photos, onChange, max, pick, hint }: PhotoPickerProps) {
   const remaining = max - photos.length;
 
   async function add() {
@@ -78,8 +87,8 @@ export function PhotoPicker({ photos, onChange, max, pick }: PhotoPickerProps) {
       </View>
 
       <Text type="body-xs" color="muted">
-        The entrance is the most useful one — it is what someone is looking for
-        when they get close.
+        {hint ??
+          'The entrance is the most useful one — it is what someone is looking for when they get close.'}
       </Text>
 
       <View className="flex-row flex-wrap gap-2">

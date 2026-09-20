@@ -133,7 +133,8 @@ Tap **+** on the map, or **Add a restroom** on your profile.
 1. **Choose on the map** opens a full-screen picker. Drag the map so the pin
    lands on the *door*, not the middle of the building — that is what helps the
    next person. It tells you which building you are over as you move.
-2. **Add up to 5 photos.** The entrance is the most useful one.
+2. **Add at least one photo, up to 5.** The entrance is the most useful one —
+   it is how the next person knows they have found the right door.
 3. Say **who can use it** — Men, Women, Anyone, or Accessible only.
 4. Give it a **landmark** someone who has never been there would recognise
    ("CLSU Lagoon"), and directions if it is hard to find ("behind the canteen,
@@ -223,7 +224,8 @@ Everything here is enforced by the app, not a guideline.
 | **2 student confirmations** | What it takes to verify a restroom. |
 | **3 reports** | Hides a restroom — but only if the reports outnumber the confirmations. |
 | **7 days** | How long a hidden restroom waits before it is deleted. Confirmations in that week bring it straight back. |
-| **5 photos** | Per restroom, and per review. |
+| **1 photo** | The minimum on a new restroom. Older entries added before this are not held to it. |
+| **5 photos** | The maximum, per restroom and per review. |
 | **2,000 characters** | Per review. |
 | **One review** | Per person, per restroom. Yours to edit forever. |
 
