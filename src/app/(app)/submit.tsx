@@ -75,12 +75,23 @@ export default function SubmitRestroomScreen() {
    * `allow create` ONLY: on update it would make every restroom currently
    * holding `photoIds: []` permanently uneditable.
    */
-  const ready =
-    Boolean(fields.point) &&
-    fields.landmark.trim().length > 0 &&
-    fields.photos.length > 0 &&
-    !form.busy &&
-    !quota.full;
+  /*
+    ⚠️ **What is missing, not just that something is.** `use-auth-gate`'s
+    docblock states the rule the whole app follows — "the button never looks
+    dead and never silently does nothing" — and a Save button greyed out at the
+    bottom of a long form breaks it: the photo hint that explains it is three
+    sections up, off screen. The quota case already had its own banner, so it is
+    deliberately not repeated here.
+  */
+  const missing = !fields.point
+    ? 'Drop a pin on the map first.'
+    : fields.landmark.trim().length === 0
+      ? 'Add a landmark so people can find it.'
+      : fields.photos.length === 0
+        ? 'Add at least one photo.'
+        : null;
+
+  const ready = missing === null && !form.busy && !quota.full;
 
   return (
     <FormScreen
@@ -171,7 +182,11 @@ export default function SubmitRestroomScreen() {
         </View>
       )}
 
-      <FormMessage blocked={blocked} error={form.error} />
+      <FormMessage
+        blocked={blocked}
+        incomplete={canWrite ? missing : null}
+        error={form.error}
+      />
 
       <Button
         size="lg"
