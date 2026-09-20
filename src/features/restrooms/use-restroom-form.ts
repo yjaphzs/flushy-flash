@@ -109,10 +109,6 @@ export function useRestroomForm(restroom?: Restroom): RestroomFormState {
     setOriginalPhotoIds(restroom.photoIds);
     setPoint(here);
     setOrigin(here);
-    // Positions the placer's camera on the existing pin WITHOUT bumping the
-    // nonce — seeding is not a confirmation, and bumping it would read as the
-    // user having just placed a pin they never touched.
-    usePinDraftStore.getState().seed(here);
   }
 
   /**
@@ -130,6 +126,26 @@ export function useRestroomForm(restroom?: Restroom): RestroomFormState {
     setSeenNonce(draftNonce);
     setPoint(draftPoint);
   }
+
+  /**
+   * Positions the placer's camera on the existing pin, WITHOUT bumping the
+   * nonce — seeding is not a confirmation, and bumping it would read as the
+   * user having just placed a pin they never touched.
+   *
+   * ⚠️ **In an effect, not the render body beside the rest of the seeding.**
+   * Setting local state during render is fine and is what the seed above does;
+   * writing to a STORE during render is not. `pin-draft-store.ts`'s own docblock
+   * says why it refused `consume()` for exactly this reason: a store write in a
+   * render body is impure and misbehaves under double-render and the React
+   * Compiler, which `app.json` turns on.
+   */
+  const restroomId = restroom?.id;
+  const lat = restroom?.location.latitude;
+  const lng = restroom?.location.longitude;
+  useEffect(() => {
+    if (lat === undefined || lng === undefined) return;
+    usePinDraftStore.getState().seed({ lat, lng });
+  }, [restroomId, lat, lng]);
 
   // Cleanup, not navigation — a later composer must not inherit this pin.
   useEffect(() => () => usePinDraftStore.getState().reset(), []);
