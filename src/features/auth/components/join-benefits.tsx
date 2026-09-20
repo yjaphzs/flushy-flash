@@ -19,10 +19,20 @@ const BENEFITS: Benefit[] = [
   { icon: 'plus', title: 'Add restrooms', detail: 'So the next person can find them too.' },
   { icon: 'star', title: 'Rate and review', detail: 'One per restroom, always yours to edit.' },
   { icon: 'heart', title: 'Save favourites', detail: 'Keep the ones worth walking to.' },
+  /*
+    ⚠️ This said "A CLSU address unlocks editing shared entries" — which was
+    false, and had become MORE false over time. Editing another person's
+    restroom was removed from `firestore.rules` on purpose (see the comment
+    above its update rule): one student account could otherwise move another
+    person's pin off campus or grant the verified badge, silently. What a CLSU
+    address actually buys is VOTE WEIGHT — `byStudent` in restroomVotes, which
+    is the only thing that feeds `trustScore`. An ordinary signed-in account's
+    confirmation is recorded and shown but scores zero.
+  */
   {
     icon: 'badge-check',
     title: 'Student badge',
-    detail: 'A CLSU address unlocks editing shared entries.',
+    detail: 'Your confirmations are what verify a restroom for everyone else.',
   },
 ];
 
