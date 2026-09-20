@@ -46,15 +46,30 @@ describe('pinKey', () => {
   it('changes when a restroom becomes verified', () => {
     // The case that silently fails without it: verified flips on a live
     // snapshot at an identical card size, and Android keeps the stale bitmap.
-    expect(pinKey(null, rated, false)).not.toEqual(pinKey(null, rated, true));
+    expect(pinKey(null, rated, false, null)).not.toEqual(pinKey(null, rated, true, null));
   });
 
   it('still changes when the photo or the rating changes', () => {
-    expect(pinKey(null, rated, true)).not.toEqual(pinKey('a.webp', rated, true));
-    expect(pinKey(null, rated, true)).not.toEqual(pinKey(null, null, true));
+    expect(pinKey(null, rated, true, null)).not.toEqual(pinKey('a.webp', rated, true, null));
+    expect(pinKey(null, rated, true, null)).not.toEqual(pinKey(null, null, true, null));
+  });
+
+  /**
+   * The newest member of the key, and the one with the shortest history: until
+   * the edit screen shipped, `status` was pinned to 'ok' at create and settable
+   * by nothing, so a pin never had to redraw for it. Now marking a restroom out
+   * of order must actually change what is on the map.
+   */
+  it('changes when a restroom stops being usable', () => {
+    expect(pinKey(null, rated, true, null)).not.toEqual(
+      pinKey(null, rated, true, 'Out of order'),
+    );
+    expect(pinKey(null, rated, true, 'Closed')).not.toEqual(
+      pinKey(null, rated, true, 'Out of order'),
+    );
   });
 
   it('is stable when nothing drawn has changed', () => {
-    expect(pinKey('a.webp', rated, true)).toEqual(pinKey('a.webp', rated, true));
+    expect(pinKey('a.webp', rated, true, null)).toEqual(pinKey('a.webp', rated, true, null));
   });
 });

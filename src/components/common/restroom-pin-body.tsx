@@ -38,6 +38,7 @@ export type PinBodyProps = {
   rating: PinRating | null;
   /** Whether the community has confirmed it exists. */
   verified: boolean;
+  status: { label: string; tone: 'danger' | 'warning' } | null;
   /** Whether this pin's sheet is currently open. */
   selected: boolean;
   /** Fires when the photo is genuinely on screen; drives the bitmap re-capture. */
@@ -71,6 +72,7 @@ export function PinBody({
   label,
   rating,
   verified,
+  status,
   selected,
   onPhotoDisplay,
 }: PinBodyProps) {
@@ -143,7 +145,32 @@ export function PinBody({
                   cannot fit beside a landmark in 132pt, and a numeral also
                   satisfies §3's rule that a fill never carries meaning alone.
                 */}
-                {rating ? (
+                {/*
+                  ⚠️ **Status outranks the rating, and shares its slot.**
+                  Whether a toilet WORKS beats how clean people found it, and
+                  this row is the only space there is — a second line changes
+                  the bitmap, the anchor offset and `MAX_PINS` at once (see
+                  above). The landmark truncates instead, which is the right
+                  thing to lose.
+
+                  Words, not a tint: §3's rule that a fill never carries meaning
+                  alone applies here more than anywhere, because the whole card
+                  is rasterised and a colour-blind reader has nothing else.
+
+                  This was invisible until the edit screen shipped — `status`
+                  was pinned to 'ok' at create and settable by nothing, so a
+                  broken toilet looked identical to a working one on the map.
+                */}
+                {status ? (
+                  <Text
+                    type="body-xs"
+                    weight="medium"
+                    numberOfLines={1}
+                    className={status.tone === 'danger' ? 'text-danger' : 'text-warning'}
+                  >
+                    {status.label}
+                  </Text>
+                ) : rating ? (
                   <View className="flex-row items-center gap-0.5">
                     <Icon name="star" size={10} color="accent" filled />
                     <Text type="body-xs" weight="medium">

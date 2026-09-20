@@ -18,6 +18,8 @@ export type RestroomPinProps = {
   rating: PinRating | null;
   /** Whether the community has confirmed it. Draws the badge. */
   verified: boolean;
+  /** Presentation only — the marker resolves the wording. Null when usable. */
+  status: { label: string; tone: 'danger' | 'warning' } | null;
   shape: PinShape;
   selected: boolean;
   onPress: () => void;
@@ -70,6 +72,7 @@ export function RestroomPin({
   label,
   rating,
   verified,
+  status,
   shape,
   selected,
   onPress,
@@ -106,7 +109,7 @@ export function RestroomPin({
       remount.
     */
     <MapViewAnnotation
-      key={pinKey(photoUrl, rating, verified)}
+      key={pinKey(photoUrl, rating, verified, status?.label ?? null)}
       ref={annotation}
       id={id}
       lngLat={toLngLat({ lat, lng })}
@@ -125,6 +128,7 @@ export function RestroomPin({
           label={label}
           rating={rating}
           verified={verified}
+          status={status}
           selected={selected}
           onPhotoDisplay={refresh}
         />
