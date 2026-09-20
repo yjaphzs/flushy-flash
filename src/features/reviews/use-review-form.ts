@@ -28,6 +28,17 @@ export type ReviewFormState = {
   failed: boolean;
   /** Re-runs the prefill read. */
   retry: () => void;
+  /**
+   * The Storage paths the form OPENED with.
+   *
+   * ⚠️ **The screen used to derive this from `photos`, and so could never delete
+   * anything.** A removed photo leaves `photos`, so it left the derived list AND
+   * `kept` at the same time — and `removed = original.filter(p => !kept.includes(p))`
+   * is empty when the path is in neither. Every photo anyone removed from a
+   * review stayed in Storage forever, invisibly, with the document no longer
+   * referencing it. It has to come from the LOADED review, not current state.
+   */
+  originalPhotoIds: readonly string[];
   rating: number;
   cleanliness: number;
   text: string;
@@ -116,6 +127,7 @@ export function useReviewForm(restroomId: string | undefined, uid: string | null
     loading: key !== null && entry === null,
     failed: entry?.failed === true,
     retry,
+    originalPhotoIds: entry?.review?.photoIds ?? [],
     rating,
     cleanliness,
     text,

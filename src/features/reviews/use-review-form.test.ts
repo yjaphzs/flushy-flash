@@ -48,6 +48,38 @@ describe('useReviewForm', () => {
     expect(result.current.failed).toBe(false);
   });
 
+  /**
+   * ⚠️ **The orphan leak.**
+   *
+   * The screen used to derive this from `form.photos`, so removing an existing
+   * photo dropped it from BOTH that list and `kept` — and `saveReview` computes
+   * `removed = originalPhotoIds.filter(p => !kept.includes(p))`, which is empty
+   * when the path is in neither. Every photo anyone ever removed from a review
+   * stayed in Storage forever, unreferenced and invisible.
+   *
+   * It has to keep naming what was LOADED, no matter what the form now holds.
+   */
+  it('remembers the photos it loaded, even after they are removed', async () => {
+    mockFetchMyReview.mockResolvedValue(REVIEW);
+    const { result } = await renderHook(() => useReviewForm('r1', 'u1'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.originalPhotoIds).toEqual(['reviews/r1_u1/0-abc.webp']);
+
+    await act(async () => result.current.setPhotos([]));
+
+    expect(result.current.photos).toEqual([]);
+    expect(result.current.originalPhotoIds).toEqual(['reviews/r1_u1/0-abc.webp']);
+  });
+
+  it('has nothing to clean up for a review that never existed', async () => {
+    mockFetchMyReview.mockResolvedValue(null);
+    const { result } = await renderHook(() => useReviewForm('r1', 'u1'));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.originalPhotoIds).toEqual([]);
+  });
+
   it('opens in create mode when there is genuinely no review', async () => {
     mockFetchMyReview.mockResolvedValue(null);
     const { result } = await renderHook(() => useReviewForm('r1', 'u1'));

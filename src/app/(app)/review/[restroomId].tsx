@@ -54,7 +54,6 @@ export default function WriteReviewScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const restroom = restrooms.find((r) => r.id === restroomId);
-  const original = form.photos.flatMap((p) => (p.kind === 'existing' ? [p.path] : []));
 
   async function onSave() {
     if (!restroomId || !uid || !restroom) return;
@@ -72,7 +71,7 @@ export default function WriteReviewScreen() {
         cleanliness: form.cleanliness,
         text: form.text,
         photos: form.photos,
-        originalPhotoIds: original,
+        originalPhotoIds: form.originalPhotoIds,
         onProgress: setProgress,
       });
       router.back();
@@ -91,7 +90,7 @@ export default function WriteReviewScreen() {
     if (!restroomId || !uid) return;
     setBusy(true);
     try {
-      await deleteReview(restroomId, uid, original);
+      await deleteReview(restroomId, uid, form.originalPhotoIds);
       router.back();
     } catch (e) {
       setError(firebaseErrorMessage(e, 'delete'));
