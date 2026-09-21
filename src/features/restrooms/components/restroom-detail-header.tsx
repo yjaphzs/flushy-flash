@@ -11,6 +11,7 @@ import { LikeButton } from '@/features/likes/components/like-button';
 import { DeleteRestroomRow } from '@/features/restrooms/components/delete-restroom-row';
 import { EditRestroomRow } from '@/features/restrooms/components/edit-restroom-row';
 import { PhotoStrip } from '@/features/restrooms/components/photo-strip';
+import { openPhotos } from '@/features/restrooms/photo-viewer';
 import {
   AccessChip,
   AmenityGrid,
@@ -152,12 +153,26 @@ export function RestroomDetailHeader({
         <AmenityGrid amenities={restroom.amenities} />
 
         {/*
-          The hero already showed the first one, so this is the remainder. A
-          strip of one photo that is also the 260pt image directly above it
-          reads as a bug.
+          ⚠️ EVERY photo, including the one the hero is showing.
+
+          This used to pass `.slice(1)` on the grounds that the hero had
+          already shown the first — which was right while a tile was only
+          something to look at, and became wrong the moment a tile became a way
+          to OPEN something. With two photos it produced a single tile, so the
+          strip looked like it held one photo when the restroom had two, and
+          the cover had no tile of its own to tap.
+
+          The `> 1` guard survives from that older reasoning and is still
+          correct for a different one: at exactly one photo the strip would be
+          a lone tile duplicating the 260pt image directly above it, and since
+          the hero is itself tappable it would offer no destination the hero
+          does not already reach.
         */}
         {restroom.photoIds.length > 1 ? (
-          <PhotoStrip photoIds={restroom.photoIds.slice(1)} />
+          <PhotoStrip
+            photoIds={restroom.photoIds}
+            onPhotoPress={(index) => openPhotos(restroom.photoIds, index)}
+          />
         ) : null}
 
         {/*

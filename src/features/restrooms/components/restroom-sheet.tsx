@@ -15,6 +15,7 @@ import {
   StatLine,
   StatusChip,
 } from '@/features/restrooms/components/restroom-detail';
+import { openPhotos } from '@/features/restrooms/photo-viewer';
 import { RestroomThumbnail } from '@/features/restrooms/components/restroom-thumbnail';
 import { useCanWrite, useUid } from '@/stores/auth-store';
 import { useBuildings } from '@/stores/campus-store';
@@ -191,7 +192,11 @@ function SheetBody({
     */
     <View className="gap-4 pt-1" style={{ paddingBottom: bottomInset }}>
       <View className="flex-row items-center gap-3">
-        <RestroomThumbnail path={restroom.photoIds[0]} size={THUMB} />
+        <RestroomThumbnail
+          path={restroom.photoIds[0]}
+          size={THUMB}
+          onPress={() => openPhotos(restroom.photoIds, 0)}
+        />
 
         <View className="flex-1 gap-0.5">
           {/*

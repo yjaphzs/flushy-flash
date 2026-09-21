@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { PhotoStrip } from '@/features/restrooms/components/photo-strip';
+import { openPhotos } from '@/features/restrooms/photo-viewer';
 import { relativeTime } from '@/features/restrooms/components/restroom-detail';
 import { Stars } from '@/features/reviews/components/stars';
 import { AuthorChip } from '@/features/users/components/author-chip';
@@ -37,7 +38,18 @@ export function ReviewCard({ review, isMine }: { review: Review; isMine: boolean
 
       {review.text ? <Text type="body-sm">{review.text}</Text> : null}
 
-      {review.photoIds.length > 0 ? <PhotoStrip photoIds={review.photoIds} /> : null}
+      {/*
+        A review's photos open in the same viewer as a restroom's, which is the
+        reason it reads its set from a store rather than a restroom id — a
+        review is not in `campus-store` and could not be looked up from a
+        route param.
+      */}
+      {review.photoIds.length > 0 ? (
+        <PhotoStrip
+          photoIds={review.photoIds}
+          onPhotoPress={(index) => openPhotos(review.photoIds, index)}
+        />
+      ) : null}
 
       {/*
         The edit affordance lives on the card rather than pinning your own

@@ -1,6 +1,6 @@
 import { Icon } from '@/components/ui/icon';
 import { Image } from '@/components/ui/image';
-import { View } from '@/components/ui/view';
+import { Pressable } from '@/components/ui/pressable';
 import { usePhotoUrl } from '@/features/restrooms/use-photo-url';
 
 export type RestroomThumbnailProps = {
@@ -8,6 +8,16 @@ export type RestroomThumbnailProps = {
   path: string | undefined;
   /** 88 in the map sheet's header, 72 in a list row. */
   size: number;
+  /**
+   * Opens the photo viewer. Optional, and it has to be.
+   *
+   * ⚠️ **`restroom-row.tsx` must never pass it.** There the tile sits inside a
+   * row that is itself a `Pressable` navigating to the restroom, so a handler
+   * here would swallow that tap on the one part of the row a thumb naturally
+   * lands on — the picture. The map sheet's header is not pressable as a
+   * whole, which is why it can.
+   */
+  onPress?: () => void;
 };
 
 /**
@@ -30,11 +40,14 @@ export type RestroomThumbnailProps = {
  * flash the previous restroom's photo, and N rows cost at most N distinct
  * resolves however many times they re-render.
  */
-export function RestroomThumbnail({ path, size }: RestroomThumbnailProps) {
+export function RestroomThumbnail({ path, size, onPress }: RestroomThumbnailProps) {
   const url = usePhotoUrl(path);
 
   return (
-    <View
+    <Pressable
+      onPress={onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? 'Photo. Opens all photos.' : undefined}
       className="items-center justify-center overflow-hidden rounded-2xl bg-surface-secondary"
       style={{ width: size, height: size, borderCurve: 'continuous' }}
     >
@@ -43,6 +56,6 @@ export function RestroomThumbnail({ path, size }: RestroomThumbnailProps) {
       ) : (
         <Icon name="image" size={Math.round(size / 3.5)} color="muted" />
       )}
-    </View>
+    </Pressable>
   );
 }

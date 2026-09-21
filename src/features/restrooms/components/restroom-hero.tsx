@@ -1,8 +1,10 @@
 import { BrandGradient } from '@/components/common/gradient';
 import { Icon } from '@/components/ui/icon';
 import { Image } from '@/components/ui/image';
+import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
+import { openPhotos } from '@/features/restrooms/photo-viewer';
 import { usePhotoUrl } from '@/features/restrooms/use-photo-url';
 
 export type RestroomHeroProps = {
@@ -41,13 +43,26 @@ const EMPTY_HEIGHT = 170;
  * If a future photo does defeat the disc, fix the disc — do not reach for a
  * scrim that dims every photo to protect one.
  *
- * ## Why only the first photo
+ * ## Why only the first photo — and what changed
  *
- * A paged carousel needs gesture handling that competes with the vertical list
- * this header lives in, and a lightbox is its own feature. The rest of the
- * photos stay in the `PhotoStrip` below, which already scrolls horizontally and
- * is shared with the review card — so the hero takes photo one and the strip
- * takes the remainder, with nothing shown twice.
+ * This used to say a carousel competes with the vertical list and "a lightbox
+ * is its own feature". **Half of that has aged and half has not**, and the
+ * difference is the whole design:
+ *
+ *  - **A carousel HERE is still wrong.** This header is the
+ *    `ListHeaderComponent` of `ReviewList`, so a pager rendered in place would
+ *    put a horizontal gesture inside a virtualized vertical scroll and the two
+ *    would fight. Nothing about that has changed, which is why the hero is
+ *    still exactly one photo.
+ *  - **The lightbox exists now**, and it does not have that problem. Tapping
+ *    the hero pushes `/photos`, a full-screen sibling route where the pager has
+ *    the screen to itself. So the hero is one photo and also the way in to all
+ *    of them.
+ *
+ * The old claim that the hero and the strip show "nothing twice" is gone with
+ * it — `restroom-detail-header.tsx` now passes the strip every photo, because
+ * once a tile is a way into the viewer, omitting the cover hides a destination
+ * rather than avoiding a repeat.
  */
 export function RestroomHero({ photoIds, title }: RestroomHeroProps) {
   const url = usePhotoUrl(photoIds[0]);
@@ -75,7 +90,14 @@ export function RestroomHero({ photoIds, title }: RestroomHeroProps) {
   }
 
   return (
-    <View style={{ height: PHOTO_HEIGHT }} className="bg-surface-secondary">
+    <Pressable
+      onPress={() => openPhotos(photoIds, 0)}
+      accessibilityRole="button"
+      accessibilityLabel={`Photo of ${title}. Opens all photos.`}
+      style={{ height: PHOTO_HEIGHT }}
+      className="bg-surface-secondary"
+      testID="restroom-hero"
+    >
       {url ? (
         <Image
           source={{ uri: url }}
@@ -84,7 +106,6 @@ export function RestroomHero({ photoIds, title }: RestroomHeroProps) {
           accessibilityLabel={`Photo of ${title}`}
         />
       ) : null}
-
-    </View>
+    </Pressable>
   );
 }
