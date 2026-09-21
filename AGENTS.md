@@ -329,12 +329,42 @@ Invariants the rules enforce — **preserve these when editing `firestore.rules`
   thing that actually measures whether anyone else has invested in the entry.
   Anything showing a count reads `photoIds.length`.
 
-  **At least one photo is required on a NEW restroom**, enforced in `submit.tsx`
-  only. The rules clause is deliberately held back a release: rules deploy on
-  merge to main and the APK ships on a tag, so tightening it early refuses
-  submissions from every phone that has not updated. When it lands it goes on
-  `allow create` ONLY — on update it would make every restroom currently holding
-  `photoIds: []` permanently uneditable.
+  **At least one photo is required on a NEW restroom**, enforced on the CLIENT
+  only — and precisely, in `use-form-steps.ts:44-49`, which is a *step-advance*
+  gate. `useSubmitRestroom` itself has no photo guard, so anything bypassing the
+  wizard can still create with none.
+
+  ⚠️ **The rules clause is deferred, and the deferral is now pinned by a
+  test rather than by this paragraph.** Rules deploy on merge to main while the
+  APK ships on a tag, so tightening early hands a bare `permission-denied` to
+  every phone that has not updated — and the updater is deliberately gentle
+  (once a session, a 24h snooze, never auto-downloading ~70 MB), so they linger.
+  `rules/firestore.test.ts` carries **`allows a create with no photos — the rule
+  is deferred`**, which is the whole future change in one place.
+
+  When it lands, it is three lines:
+
+  1. flip that test to `assertFails` and rename it;
+  2. add `&& incoming().photoIds.size() >= 1` at **`firestore.rules:204`**;
+  3. delete this warning.
+
+  ⚠️ **Three things the clause must not do**, each of which looks reasonable:
+
+  - **Not inside `isValidPhotoIds()`** (`firestore.rules:131`) — `reviews` shares
+    that helper at lines 334 and 358, and a review's photos are optional.
+  - **Not on `allow update`** (line 258) — every restroom currently holding
+    `photoIds: []` would become permanently uneditable, which is exactly why
+    `edit-restroom.tsx` prompts for a photo rather than blocking on one.
+  - **Omitting `photoIds` entirely is already denied**, because `hasOnly()`
+    permits a subset and reading an absent key is an evaluation error. Only
+    `photoIds: []` gets through today.
+
+  ⚠️ **The blast radius was in the shared fixture, and has been defused.**
+  `restroomDoc()` defaulted to `photoIds: []`, so the clause would have broken
+  four `assertSucceeds` creates outright and hollowed out a dozen `assertFails`
+  ones — still failing, but for the missing photo instead of the attack each
+  names, leaving the suite green while testing nothing. The fixture now carries
+  one photo, which is also what a real submission looks like.
 - **Aggregates are never client-writable.** `ratingSum`, `ratingCount`,
   `photoCount` and the social counters reject client writes. Ratings are read live
   via `getAggregateFromServer` (`src/features/restrooms/api.ts`) wherever a live

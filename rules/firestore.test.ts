@@ -65,7 +65,18 @@ function restroomDoc(overrides: Record<string, unknown> = {}) {
     buildingId: BUILDING_ID,
     floor: 1,
     landmark: 'CLSU Lagoon',
-    photoIds: [],
+    // ⚠️ ONE photo, not zero, and the difference is the point.
+    //
+    // Every restroom create test flows through this fixture. While it defaulted
+    // to `[]`, adding the deferred "at least one photo on create" clause (see
+    // AGENTS.md §7) would have broken four `assertSucceeds` creates outright and
+    // quietly hollowed out a dozen `assertFails` ones — each would still fail,
+    // but for the missing photo rather than the attack it names, so the suite
+    // would stay green while testing nothing.
+    //
+    // A real submission has a photo, so this is also the more honest fixture.
+    // The one test that needs zero passes `photoIds: []` explicitly, below.
+    photoIds: photoPaths(1),
     locationNote: 'Near the east stairwell',
     amenities: {
       isFree: true,
@@ -609,6 +620,33 @@ describe('restrooms', () => {
     const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
     await assertSucceeds(
       setDoc(doc(db, 'restrooms', 'restroom-2'), restroomDoc({ photoIds: photoPaths(5) })),
+    );
+  });
+
+  /**
+   * ⚠️ **DEFERRED, not permitted by design. This test is meant to be inverted.**
+   *
+   * The client has required a photo on a new restroom since v1.3.0, enforced in
+   * `use-form-steps.ts`. The RULE is held back deliberately: rules deploy on
+   * merge to main while the APK ships on a tag, so tightening early hands a
+   * bare `permission-denied` to every phone that has not updated — and the
+   * in-app updater is deliberately gentle (once a session, a 24h snooze, never
+   * auto-downloading ~70 MB), so those phones linger.
+   *
+   * When it lands the whole change is three lines:
+   *   1. flip this to `assertFails` and rename it to `denies a create with no photos`
+   *   2. add `&& incoming().photoIds.size() >= 1` at firestore.rules:204
+   *   3. drop the ⚠️ paragraph from AGENTS.md §7
+   *
+   * It must go on `allow create` ONLY — never inside `isValidPhotoIds()`, which
+   * `reviews` shares and where photos are genuinely optional, and never on
+   * `allow update`, which would make every restroom currently holding
+   * `photoIds: []` permanently uneditable.
+   */
+  it('allows a create with no photos — the rule is deferred, see AGENTS.md §7', async () => {
+    const db = testEnv.authenticatedContext(ALICE, clsuStudent).firestore();
+    await assertSucceeds(
+      setDoc(doc(db, 'restrooms', 'restroom-2'), restroomDoc({ photoIds: [] })),
     );
   });
 
