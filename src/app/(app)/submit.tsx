@@ -1,37 +1,107 @@
+import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 
-import { Button } from '@/components/ui/button';
-import { PinField } from '@/features/restrooms/components/pin-field';
-import { PhotoPicker } from '@/features/restrooms/components/photo-picker';
+import { FormMessage } from '@/components/feedback/form-message';
 import { FormScreen } from '@/components/layouts/form-screen';
+import { StepIndicator } from '@/components/common/step-indicator';
+import { Button } from '@/components/ui/button';
+import { Gesture, GestureDetector } from '@/components/ui/gesture';
+import {
+  Animated,
+  SPRING,
+  runOnJS,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+} from '@/components/ui/motion';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
-import {
-  TextField,
-  TextFieldDescription,
-  TextFieldInput,
-  TextFieldLabel,
-} from '@/components/forms/text-field';
-import { FormMessage } from '@/components/feedback/form-message';
-import {
-  AccessChips,
-  AmenityChips,
-} from '@/features/restrooms/components/amenity-chips';
-import { useRestroomForm } from '@/features/restrooms/use-restroom-form';
-import { useSubmitRestroom } from '@/features/restrooms/use-submit-restroom';
 import { JoinBenefits } from '@/features/auth/components/join-benefits';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
+import {
+  StepDetails,
+  StepFinding,
+  StepPhoto,
+  StepWhere,
+} from '@/features/restrooms/components/submit-steps';
+import { usePendingQuota } from '@/features/restrooms/pending-quota';
+import { STEPS, useFormSteps } from '@/features/restrooms/use-form-steps';
+import { useRestroomForm } from '@/features/restrooms/use-restroom-form';
+import { useSubmitRestroom } from '@/features/restrooms/use-submit-restroom';
 import { useWriteBlock } from '@/hooks/use-write-block';
 import { useCanWrite, useUid } from '@/stores/auth-store';
-import { usePendingQuota } from '@/features/restrooms/pending-quota';
 
+/** Sideways travel before the pan claims the touch from the vertical scroll. */
+const SWIPE_SLOP = 12;
+/** How far a drag must go to count as a step rather than a wobble. */
+const SWIPE_COMMIT = 60;
+
+const TITLES = STEPS.map((s) => s.title);
+
+/**
+ * Add a restroom, four steps at a time.
+ *
+ * ⚠️ **The steps are in-screen state and every one stays mounted.** A
+ * step-per-route stepper would unmount this screen when the full-screen placer
+ * opens, and picked photos are local file URIs — see `pin-draft-store.ts`.
+ *
+ * ⚠️ **Next lives in the scroll flow, not a fixed footer.** There is no
+ * KeyboardAvoidingView in this codebase and no keyboard-controller package;
+ * `avoidsKeyboard` is one iOS ScrollView prop that pads scroll CONTENT, so a
+ * pinned footer would sit under the keyboard on iOS exactly when step 3's text
+ * fields are open. Every other form in the app ends with its button in flow.
+ */
 export default function SubmitRestroomScreen() {
   const uid = useUid();
   const canWrite = useCanWrite();
   const requestWrite = useRequestWrite();
   const blocked = useWriteBlock();
+  const reduced = useReducedMotion();
   const form = useSubmitRestroom();
   const fields = useRestroomForm();
+  const steps = useFormSteps(fields);
+
+  const quota = usePendingQuota(uid);
+
+  const [width, setWidth] = useState(0);
+  const x = useSharedValue(0);
+  const drag = useSharedValue(0);
+
+  /*
+    The track's resting position. Written in an effect and read in a worklet —
+    a worklet closing over `steps.index` would re-run on change and SNAP rather
+    than travel, which looks identical to no animation at all.
+  */
+  useEffect(() => {
+    const to = -steps.index * width;
+    x.set(reduced || width === 0 ? to : withSpring(to, SPRING));
+  }, [steps.index, width, x, reduced]);
+
+  const trackStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.get() + drag.get() }],
+  }));
+
+  /*
+    ⚠️ `activeOffsetX` is what keeps the form scrollable: without it a vertical
+    drag is claimed by this pan and the page cannot move. Forward is refused
+    while the step is unfinished — the track springs back, which says "not yet"
+    without a dialog.
+  */
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-SWIPE_SLOP, SWIPE_SLOP])
+    .onUpdate((e) => {
+      const forward = e.translationX < 0;
+      const blockedWay = forward ? steps.isLast || steps.missing !== null : steps.isFirst;
+      // Rubber-band rather than refuse outright, so the gesture still responds.
+      drag.set(blockedWay ? e.translationX / 4 : e.translationX);
+    })
+    .onEnd((e) => {
+      const far = Math.abs(e.translationX) > SWIPE_COMMIT;
+      if (far && e.translationX < 0) runOnJS(steps.next)();
+      else if (far && e.translationX > 0) runOnJS(steps.back)();
+      drag.set(withSpring(0, SPRING));
+    });
 
   async function onSubmit() {
     if (!uid) return;
@@ -51,125 +121,68 @@ export default function SubmitRestroomScreen() {
     if (id) router.back();
   }
 
-  /**
-   * The contribution cap, surfaced rather than discovered.
-   *
-   * `firestore.rules` refuses the create at three pending restrooms, so without
-   * this the user fills in a whole form, presses Save, and gets a permission
-   * error naming nothing they could have known in advance.
-   */
-  const quota = usePendingQuota(uid);
-
-  /**
-   * ⚠️ **At least one photo, which is new.**
-   *
-   * A pin with no picture is the hardest entry to trust and the hardest to
-   * find: the photo IS the "is this the right door" check, and the map pin
-   * renders it rather than a glyph.
-   *
-   * ⚠️ **Enforced here only, deliberately.** The matching `firestore.rules`
-   * clause is held back a release because the two do not ship together — rules
-   * deploy on merge to main, the APK on a tag — so adding it today would start
-   * refusing submissions from every phone that has not updated yet, with a bare
-   * permission-denied naming nothing. When it does land it must go on
-   * `allow create` ONLY: on update it would make every restroom currently
-   * holding `photoIds: []` permanently uneditable.
-   */
-  /*
-    ⚠️ **What is missing, not just that something is.** `use-auth-gate`'s
-    docblock states the rule the whole app follows — "the button never looks
-    dead and never silently does nothing" — and a Save button greyed out at the
-    bottom of a long form breaks it: the photo hint that explains it is three
-    sections up, off screen. The quota case already had its own banner, so it is
-    deliberately not repeated here.
-  */
-  const missing = !fields.point
-    ? 'Drop a pin on the map first.'
-    : fields.landmark.trim().length === 0
-      ? 'Add a landmark so people can find it.'
-      : fields.photos.length === 0
-        ? 'Add at least one photo.'
-        : null;
-
-  const ready = missing === null && !form.busy && !quota.full;
+  const saving = steps.isLast;
+  const acting = saving ? onSubmit : steps.next;
+  const stuck = steps.missing !== null || form.busy || (saving && (!canWrite || quota.full));
 
   return (
     <FormScreen
       title="Add a restroom"
-      subtitle="Drop a pin where it is, then tell people how to find it."
+      subtitle={steps.step.blurb}
       onBack={() => router.back()}
       avoidsKeyboard
     >
+      <StepIndicator
+        titles={TITLES}
+        index={steps.index}
+        furthest={steps.furthest}
+        onSelect={steps.goTo}
+      />
+
       {/*
-        Only once it matters. A quota line above an empty form on someone's
-        first contribution is a rule looking for a rule-breaker; at two of
-        three it is genuinely useful information.
+        One track holding all four steps side by side, clipped to the screen.
+        Each step is `width` wide, so the track is 4x and translateX picks one.
       */}
-      {canWrite && quota.used > 0 ? (
-        <Text type="body-sm" color={quota.full ? undefined : 'muted'}
-          className={quota.full ? 'text-danger' : undefined}>
+      <View className="overflow-hidden" onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+        <GestureDetector gesture={swipe}>
+          <Animated.View style={[{ flexDirection: 'row', width: width * STEPS.length }, trackStyle]}>
+            <View style={{ width }}>
+              <StepWhere fields={fields} />
+            </View>
+            <View style={{ width }}>
+              <StepPhoto fields={fields} maxPhotos={form.maxPhotos} pickPhotos={form.pickPhotos} />
+            </View>
+            <View style={{ width }}>
+              <StepFinding fields={fields} />
+            </View>
+            <View style={{ width }}>
+              <StepDetails fields={fields} onJump={steps.goTo} />
+            </View>
+          </Animated.View>
+        </GestureDetector>
+      </View>
+
+      {/*
+        Only once it matters, and only on the step that saves. A quota line on
+        step one is a rule looking for a rule-breaker.
+      */}
+      {saving && canWrite && quota.used > 0 ? (
+        <Text
+          type="body-sm"
+          color={quota.full ? undefined : 'muted'}
+          className={quota.full ? 'text-danger' : undefined}
+        >
           {quota.full
             ? `You have ${quota.cap} restrooms waiting to be confirmed. Once students confirm one, you can add another.`
             : `${quota.used} of ${quota.cap} pending. Verified restrooms do not count.`}
         </Text>
       ) : null}
 
-      <PinField point={fields.point} building={fields.building} />
-
-      <PhotoPicker
-        photos={fields.photos}
-        onChange={fields.setPhotos}
-        max={form.maxPhotos}
-        pick={form.pickPhotos}
-        hint="At least one, so people can tell they have found the right door."
-      />
-
-      <AccessChips value={fields.genderedAs} onChange={fields.setGenderedAs} />
-
-      <TextField>
-        <TextFieldLabel>Landmark</TextFieldLabel>
-        <TextFieldInput
-          value={fields.landmark}
-          onChangeText={fields.setLandmark}
-          placeholder="CLSU Lagoon"
-          maxLength={80}
-        />
-        <TextFieldDescription>
-          The nearest thing someone who has never been here would recognise.
-        </TextFieldDescription>
-      </TextField>
-
-      <TextField>
-        <TextFieldLabel>How to get there</TextFieldLabel>
-        <TextFieldInput
-          value={fields.locationNote}
-          onChangeText={fields.setLocationNote}
-          placeholder="Behind the canteen, past the east stairwell"
-          maxLength={200}
-        />
-        <TextFieldDescription>
-          How you would describe it to a classmate on the phone.
-        </TextFieldDescription>
-      </TextField>
-
-      <TextField>
-        <TextFieldLabel>Floor</TextFieldLabel>
-        <TextFieldInput
-          value={fields.floor}
-          onChangeText={fields.setFloor}
-          keyboardType="number-pad"
-        />
-        <TextFieldDescription>Ground floor is 1.</TextFieldDescription>
-      </TextField>
-
-      <AmenityChips value={fields.amenities} onChange={fields.setAmenities} />
-
       {/*
-        Defence in depth. The map button routes taps through the gate, but
-        /submit is a deep link and a guest can arrive cold. Showing what an
-        account buys beats showing a form whose submit firestore.rules refuses.
+        Defence in depth, on the last step where it is actually relevant.
+        /submit is a deep link and a guest can arrive cold.
       */}
-      {canWrite ? null : (
+      {saving && !canWrite ? (
         <View className="gap-4">
           <JoinBenefits />
           <Button
@@ -180,22 +193,25 @@ export default function SubmitRestroomScreen() {
             <Button.Label>Create an account to add this</Button.Label>
           </Button>
         </View>
-      )}
+      ) : null}
 
-      <FormMessage
-        blocked={blocked}
-        incomplete={canWrite ? missing : null}
-        error={form.error}
-      />
+      <FormMessage blocked={blocked} incomplete={steps.missing} error={form.error} />
 
-      <Button
-        size="lg"
-        className="rounded-full"
-        onPress={onSubmit}
-        isDisabled={!ready || !canWrite || blocked !== null}
-      >
-        <Button.Label>{form.progress ?? 'Save restroom'}</Button.Label>
-      </Button>
+      <View className="flex-row gap-3">
+        {steps.isFirst ? null : (
+          <Button variant="secondary" size="lg" className="flex-1 rounded-full" onPress={steps.back}>
+            <Button.Label>Back</Button.Label>
+          </Button>
+        )}
+        <Button
+          size="lg"
+          className="flex-1 rounded-full"
+          onPress={() => void acting()}
+          isDisabled={stuck || (saving && blocked !== null)}
+        >
+          <Button.Label>{form.progress ?? (saving ? 'Save restroom' : 'Next')}</Button.Label>
+        </Button>
+      </View>
     </FormScreen>
   );
 }
