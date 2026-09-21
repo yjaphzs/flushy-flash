@@ -863,6 +863,46 @@ and for a while they had — **that is repaired**: `RestroomDetailHeader` render
 `RestroomHero` + `PhotoStrip` and imports `StatusChip` / `AccessChip` / `StatRow`
 / `AmenityGrid` from the shared file.
 
+**Every photo opens full screen**, from three surfaces: the hero, the strip's
+tiles (at THAT tile's index) and the map sheet's thumbnail. `app/(app)/photos.tsx`
+is a `fullScreenModal` sibling route reading `stores/photo-viewer-store.ts`; a
+store and not route params because the payload is an array and because REVIEW
+photos use the same viewer and are not in `campus-store`. Five things:
+
+- ⚠️ **A route, not an overlay, and `restroom-hero.tsx` explains why.** Its
+  docblock argued against a carousel because the hero is the
+  `ListHeaderComponent` of `ReviewList`, so a pager in place would fight the
+  vertical scroll. That is **still true** — which is why the hero is still one
+  photo. The lightbox simply does not have that problem.
+- ⚠️ **Zoom and paging are one gesture until split, in TWO places, and both
+  are needed.** `activeOffsetX` is applied only while un-zoomed, so the pager
+  gets horizontal drags; and the pager sets `scrollEnabled={false}` while
+  zoomed, because gesture config alone leaves a native scroll and a pan racing.
+  Either alone is a bug you can feel.
+- ⚠️ **`allowDownscaling={false}`** on anything pinchable. expo-image decodes
+  to the size of the view, so without it a 4x pinch magnifies a screen-sized
+  decode and no amount of source resolution helps.
+- ⚠️ **Zoom state lives in the PAGER, not the slide.** A local copy kept in
+  step needs a setState inside an effect, which the React Compiler lint
+  refuses — the same trap `use-photo-url.ts` documents two paragraphs down.
+- Paging is `List horizontal pagingEnabled`: LegendList's props are
+  `Omit<ScrollViewProps, …six keys>` and neither `pagingEnabled` nor
+  `scrollEnabled` is omitted, so no wrapper change was needed.
+
+⚠️ **The strip gets EVERY photo, including the hero's.** It used to be passed
+`.slice(1)`, which with two photos produced one tile — so a restroom with two
+looked like it had one, and the cover had no tile to tap. That slice was right
+while a tile was only something to look at and wrong the moment it became a way
+to open something. The `length > 1` guard survives for a different reason than
+it was written: at exactly one photo the strip would duplicate the 260pt image
+above it and reach nothing the (now tappable) hero does not.
+
+⚠️ **Both new press handlers are OPTIONAL props and must stay optional.**
+`PhotoStrip`'s other caller is `review-card.tsx`, and `RestroomThumbnail`'s is
+`restroom-row.tsx` — where the tile sits inside a row that is already a
+`Pressable` navigating to the restroom, so a handler would swallow the row tap
+on the part of the row a thumb naturally lands on.
+
 Storage paths, not download URLs, are what the document stores — a URL carries a
 token and goes stale. `use-photo-url.ts` resolves them and memoises **by path,
 process-wide**, so the pin and the sheet share one request per image. It is
@@ -1274,6 +1314,22 @@ Three, each of which drifts silently. Change them together:
 
 `src/components/common/google-mark.tsx` holds Google's four brand hexes and is
 **not** ours to recolour.
+
+### The one token that does not follow the scheme
+
+`--viewer-ground` is the full-screen photo viewer's background, and it is the
+same near-black in light and dark. A photo viewer is the only surface where the
+content IS the interface: on a light ground a `contentFit="contain"` photo sits
+in white bars that read as part of the image, and every judgement about how
+bright a restroom actually is gets made against the wrong reference. It is
+darker than the map's `land` (#14181A) so a photograph is reliably the brightest
+thing on screen.
+
+Chrome over it — the back disc, the counter pill — reuses
+`floating-back-button.tsx`'s argument rather than a foreground token of its own:
+a photograph is arbitrary content, so no text colour has verifiable contrast
+over it, and a known opaque background does. That is why there is no
+`--on-viewer`.
 
 ### `color-mix()` is evaluated in sRGB, and drops alpha
 
