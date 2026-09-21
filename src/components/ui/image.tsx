@@ -35,6 +35,18 @@ export type ImageProps = Pick<
   | 'onError'
   /** Needed by any recycling list of remote images, e.g. a photo strip. */
   | 'recyclingKey'
+  /**
+   * Decode at the source's own resolution instead of the view's.
+   *
+   * ⚠️ **Pass `false` on anything that can be pinched.** expo-image downscales a
+   * decode to the size of the view it is painting into, which is exactly right
+   * for a 132pt tile and exactly wrong for a photo the user can then zoom to
+   * 4x — the upscale is of the *thumbnail*, so it is soft in a way no amount of
+   * source resolution fixes. The cost is real, which is why it is not the
+   * default here: a full-resolution decode of a 1600px WebP is held in memory
+   * for as long as the view lives.
+   */
+  | 'allowDownscaling'
 >;
 
 export function Image(props: ImageProps) {

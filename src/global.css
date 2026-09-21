@@ -70,6 +70,16 @@
    * the app (JS -> app). A third independent value would drift against both.
    * app.json carries the resolved sRGB — see the note beside each scheme. */
   --color-splash-ground: var(--background);
+  /* The full-screen photo viewer's ground, and the one colour in this file
+   * that deliberately does NOT follow the scheme. A photo viewer is the only
+   * surface where the content IS the interface: on a light ground a contained
+   * photo sits in white bars that read as part of the image, and every
+   * judgement about how bright a restroom actually is gets made against the
+   * wrong reference. Darker than the map's --land (#14181A) so a photograph
+   * is reliably the brightest thing on screen. Chrome over it reuses the
+   * opaque-disc trick from floating-back-button.tsx rather than a token of
+   * its own, so nothing here needs an --on-viewer. */
+  --color-viewer-ground: var(--viewer-ground);
   --color-accent-hover: var(--accent-hover);
   --color-on-accent: var(--on-accent);
   --color-on-brand: var(--on-brand);
@@ -116,6 +126,7 @@
   /* Shared across both schemes. */
   --radius: 0.5rem;
   --field-radius: 0.75rem;
+  --viewer-ground: oklch(11% 0.003 164.26);
 
   @variant light {
     /* Base. --background MUST stay opaque: GlassView's

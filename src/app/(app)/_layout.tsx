@@ -93,6 +93,18 @@ export default function AppLayout() {
           name="edit-restroom"
           options={{ presentation: 'modal', title: 'Edit restroom', sheetGrabberVisible: true }}
         />
+        {/*
+          fullScreenModal for the same reason pick-location is one, plus a
+          second: a photo viewer that is a page sheet shows the screen it came
+          from around its edges, which defeats the point of looking at the
+          photograph. It is a sibling of /restroom/[id] rather than nested, so
+          dismissing it returns to exactly the scroll position it was opened
+          from.
+        */}
+        <Stack.Screen
+          name="photos"
+          options={{ presentation: 'fullScreenModal', title: 'Photos', animation: 'fade' }}
+        />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="my-restrooms" options={{ title: 'Your restrooms' }} />
       </Stack>
