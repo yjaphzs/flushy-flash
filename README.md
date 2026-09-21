@@ -76,7 +76,7 @@ work.
 | Adding one | Placing the pin |
 |:---:|:---:|
 | <img src="assets/screenshots/submit.png" width="250" alt="The add-a-restroom form" /> | <img src="assets/screenshots/pick-location.png" width="250" alt="Full-screen pin placer naming the nearest building" /> |
-| Only the pin and a landmark are required. | Drag the map; the pin stays put. |
+| A pin, a photo and a landmark. | Drag the map; the pin stays put. |
 
 </div>
 
@@ -130,19 +130,25 @@ toilet should not require signing up.
 
 Tap **+** on the map, or **Add a restroom** on your profile.
 
-1. **Choose on the map** opens a full-screen picker. Drag the map so the pin
-   lands on the *door*, not the middle of the building — that is what helps the
-   next person. It tells you which building you are over as you move.
-2. **Add at least one photo, up to 5.** The entrance is the most useful one —
-   it is how the next person knows they have found the right door.
-3. Say **who can use it** — Men, Women, Anyone, or Accessible only.
-4. Give it a **landmark** someone who has never been there would recognise
-   ("CLSU Lagoon"), and directions if it is hard to find ("behind the canteen,
-   past the east stairwell").
-5. Add the floor and whatever amenities you noticed.
+It is four steps, a few fields at a time. You can swipe between them, or tap a
+step you have already done to go back and change it.
 
-Only the pin and the landmark are required. Anything you are unsure about, leave
-blank — the app shows it as unknown rather than guessing.
+1. **Where.** A preview of the spot, and **Choose on the map** to open a
+   full-screen picker. Drag the map so the pin lands on the *door*, not the
+   middle of the building — that is what helps the next person. It tells you
+   which building you are over as you move.
+2. **Photo.** At least one, up to 5. The entrance is the most useful one — it is
+   how the next person knows they have found the right door.
+3. **Finding it.** A **landmark** someone who has never been there would
+   recognise ("CLSU Lagoon"), directions if it is hard to find ("behind the
+   canteen, past the east stairwell"), and the floor.
+4. **Details.** Who can use it — Men, Women, Anyone, or Accessible only — and
+   whatever amenities you noticed. This step also recaps everything you have
+   answered, so you can check it before saving.
+
+A pin, a photo and a landmark are required; the rest is optional. Anything you
+are unsure about, leave blank — the app shows it as unknown rather than
+guessing.
 
 ### Review one
 
