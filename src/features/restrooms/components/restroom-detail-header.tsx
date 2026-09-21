@@ -9,6 +9,7 @@ import { View } from '@/components/ui/view';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { LikeButton } from '@/features/likes/components/like-button';
 import { DeleteRestroomRow } from '@/features/restrooms/components/delete-restroom-row';
+import { EditRestroomRow } from '@/features/restrooms/components/edit-restroom-row';
 import { PhotoStrip } from '@/features/restrooms/components/photo-strip';
 import {
   AccessChip,
@@ -180,6 +181,13 @@ export function RestroomDetailHeader({
             href={`/restroom/${restroom.id}`}
           />
         </View>
+
+        {/*
+          Above the destructive one, and it outlives it: editing stays available
+          for as long as the entry does, where deleting stops the moment someone
+          else has engaged with it.
+        */}
+        <EditRestroomRow restroom={restroom} />
 
         {/*
           Last, below everything constructive. Renders nothing unless the viewer

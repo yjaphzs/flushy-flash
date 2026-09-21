@@ -2,6 +2,7 @@ import type { PinShape } from '@/components/common/pin-zoom';
 import { RestroomPin } from '@/components/common/restroom-pin';
 import { usePhotoUrl } from '@/features/restrooms/use-photo-url';
 import { pinRating } from '@/features/restrooms/rating';
+import { STATUS } from '@/features/restrooms/labels';
 import type { Building, Restroom } from '@/lib/types';
 
 export type RestroomMarkerProps = {
@@ -48,6 +49,18 @@ export function RestroomMarker({
   */
   const rating = pinRating(restroom);
 
+  /*
+    Resolved HERE rather than in the pin: `components/common` draws the card and
+    must not know this app's vocabulary, and `labels.ts` is the one place those
+    words live — `StatusChip` and the map's filter sheet read the same table.
+  */
+  const status =
+    restroom.status === 'ok'
+      ? null
+      // `STATUS.color` is typed for Chip, which also admits 'success'; only the
+      // two unusable states reach here, so narrowing is total.
+      : { label: STATUS[restroom.status].label, tone: STATUS[restroom.status].color as 'danger' | 'warning' };
+
   return (
     <RestroomPin
       id={restroom.id}
@@ -57,6 +70,7 @@ export function RestroomMarker({
       label={label}
       rating={rating}
       verified={restroom.verified}
+      status={status}
       shape={shape}
       selected={selected}
       onPress={onPress}

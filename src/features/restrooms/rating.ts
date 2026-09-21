@@ -45,7 +45,18 @@ export function pinRatingKey(rating: PinRating | null): string {
  * a pure content change at an identical size, which is exactly what Android
  * refuses to repaint. A badge left out of this key would simply never appear
  * for anyone already looking at the map.
+ *
+ * ⚠️ `statusLabel` is in here for exactly that reason and is the newest case:
+ * it only became possible to CHANGE once the edit screen shipped, so before
+ * that every restroom was `ok` forever and the pin never had to redraw for it.
+ * Marking a restroom out of order and watching its pin not change is the
+ * failure this prevents.
  */
-export function pinKey(photoUrl: string | null, rating: PinRating | null, verified: boolean) {
-  return `${photoUrl ?? 'glyph'}|${pinRatingKey(rating)}|${verified ? 'v' : 'u'}`;
+export function pinKey(
+  photoUrl: string | null,
+  rating: PinRating | null,
+  verified: boolean,
+  statusLabel: string | null,
+) {
+  return `${photoUrl ?? 'glyph'}|${pinRatingKey(rating)}|${verified ? 'v' : 'u'}|${statusLabel ?? 'ok'}`;
 }

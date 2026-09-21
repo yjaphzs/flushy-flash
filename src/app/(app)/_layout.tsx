@@ -84,6 +84,15 @@ export default function AppLayout() {
           name="pick-location"
           options={{ presentation: 'fullScreenModal', title: 'Where is it?' }}
         />
+        {/*
+          A modal like /submit, and a SIBLING of pick-location for the same
+          reason /submit is: the placer has to be able to open over it without
+          unmounting it, or every photo picked so far is lost.
+        */}
+        <Stack.Screen
+          name="edit-restroom"
+          options={{ presentation: 'modal', title: 'Edit restroom', sheetGrabberVisible: true }}
+        />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="my-restrooms" options={{ title: 'Your restrooms' }} />
       </Stack>

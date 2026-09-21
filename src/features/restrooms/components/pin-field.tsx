@@ -8,6 +8,7 @@ import { Pressable } from '@/components/ui/pressable';
 import { Text } from '@/components/ui/text';
 import { View } from '@/components/ui/view';
 import { useStaticMap } from '@/features/restrooms/use-static-map';
+import { useBuildings } from '@/stores/campus-store';
 import type { LatLng } from '@/lib/campus';
 import type { Building } from '@/lib/types';
 
@@ -88,6 +89,16 @@ function PinPreview({
   onPress,
 }: PinFieldProps & { onPress: () => void }) {
   const { uri } = useStaticMap(point, { width: 340, height: PREVIEW_H });
+  /*
+    ⚠️ **"Not near a mapped building" is a claim about the PIN, and with no
+    buildings loaded it is a claim about the wrong thing.** `snapBuilding`
+    returns null for every point on campus when the collection is empty — a
+    cold cache, no signal, or a failed read — so this told the user their pin
+    was in a field, for every pin, including one dropped on the library steps.
+    `pick-location.tsx` carried the identical line and was fixed; this copy was
+    missed, which is exactly how two surfaces showing one fact drift apart.
+  */
+  const buildings = useBuildings();
 
   return (
     <Pressable
@@ -121,7 +132,11 @@ function PinPreview({
 
       <View className="flex-row items-center justify-between">
         <Text type="body-sm" color="muted" className="flex-1">
-          {building ? `Looks like ${building.name}.` : 'Not near a mapped building.'}
+          {building
+            ? `Looks like ${building.name}.`
+            : buildings.length === 0
+              ? 'Building names are unavailable right now.'
+              : 'Not near a mapped building.'}
         </Text>
         <View className="flex-row items-center gap-1">
           <Text type="body-sm" weight="medium">
