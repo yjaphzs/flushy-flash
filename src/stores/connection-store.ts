@@ -32,11 +32,14 @@ import { create } from 'zustand';
  */
 export const OFFLINE_GRACE_MS = 2000;
 
+/** Every listener that reports. Each is tracked separately — see `report`. */
+export type ConnectionSource = 'buildings' | 'restrooms';
+
 type ConnectionState = {
   /** Optimistic: true until proven otherwise, never "unknown". */
   online: boolean;
   /** Called with `snapshot.metadata.fromCache` on every snapshot. */
-  report: (fromCache: boolean) => void;
+  report: (source: ConnectionSource, fromCache: boolean) => void;
   /** Cancels a pending verdict and returns to optimistic. For teardown. */
   reset: () => void;
 };
@@ -46,6 +49,22 @@ type ConnectionState = {
 // re-render when the countdown starts rather than when it lands.
 let pending: ReturnType<typeof setTimeout> | undefined;
 
+/**
+ * The last `fromCache` each listener reported.
+ *
+ * ⚠️ **This used to be one global flag, and that was a real bug** — an online
+ * phone could get stuck showing "You're offline" with its writes blocked.
+ * Both campus listeners called one `report(fromCache)`, so whichever spoke last
+ * won: `restrooms` reporting a live snapshot set online, then `buildings`
+ * reporting a cached one set offline, and with nothing further to deliver
+ * nothing ever set it back. Caught on the emulator, where `buildings` is empty
+ * and answers from cache every time while `restrooms` answers from the server.
+ *
+ * The comment that used to be here claimed taking whichever spoke last was
+ * "self-healing rather than a race". It was exactly a race.
+ */
+let cached: Partial<Record<ConnectionSource, boolean>> = {};
+
 const cancel = () => {
   clearTimeout(pending);
   pending = undefined;
@@ -54,12 +73,17 @@ const cancel = () => {
 export const useConnectionStore = create<ConnectionState>((set, get) => ({
   online: true,
 
-  report: (fromCache) => {
-    if (!fromCache) {
+  report: (source, fromCache) => {
+    cached[source] = fromCache;
+
+    // ONE server-backed listener is proof of a connection. Requiring all of
+    // them would let the quietest collection speak for the whole app.
+    if (Object.values(cached).some((c) => c === false)) {
       cancel();
       if (!get().online) set({ online: true });
       return;
     }
+
     // Already offline, or already counting down. Re-arming the timer on every
     // cached snapshot would push the verdict out indefinitely.
     if (!get().online || pending !== undefined) return;
@@ -71,6 +95,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
 
   reset: () => {
     cancel();
+    cached = {};
     set({ online: true });
   },
 }));

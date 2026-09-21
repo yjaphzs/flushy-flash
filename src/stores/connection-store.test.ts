@@ -1,7 +1,12 @@
-import { OFFLINE_GRACE_MS, useConnectionStore } from '@/stores/connection-store';
+import {
+  OFFLINE_GRACE_MS,
+  useConnectionStore,
+  type ConnectionSource,
+} from '@/stores/connection-store';
 
 const online = () => useConnectionStore.getState().online;
-const report = (fromCache: boolean) => useConnectionStore.getState().report(fromCache);
+const report = (fromCache: boolean, source: ConnectionSource = 'restrooms') =>
+  useConnectionStore.getState().report(source, fromCache);
 
 describe('connection store', () => {
   beforeEach(() => {
@@ -69,6 +74,47 @@ describe('connection store', () => {
     jest.advanceTimersByTime(100);
 
     expect(online()).toBe(false);
+  });
+
+  /**
+   * ⚠️ **The bug this store shipped with, in v1.2.0.**
+   *
+   * Both campus listeners called one `report(fromCache)`, so whichever spoke
+   * last won. `restrooms` reporting a live snapshot then `buildings` reporting
+   * a cached one left an ONLINE phone stuck offline — with its writes blocked,
+   * because `useWriteBlock` reads this — and nothing further arrived to correct
+   * it. Found on the emulator, where `buildings` is empty and always answers
+   * from cache while `restrooms` answers from the server.
+   *
+   * One server-backed listener is proof of a connection.
+   */
+  it('stays online when one listener is live and another answers from cache', () => {
+    report(false, 'restrooms');
+    report(true, 'buildings');
+    jest.advanceTimersByTime(OFFLINE_GRACE_MS * 2);
+
+    expect(online()).toBe(true);
+  });
+
+  it('goes offline only once every listener is answering from cache', () => {
+    report(false, 'restrooms');
+    report(true, 'buildings');
+    jest.advanceTimersByTime(OFFLINE_GRACE_MS);
+    expect(online()).toBe(true);
+
+    report(true, 'restrooms');
+    jest.advanceTimersByTime(OFFLINE_GRACE_MS);
+    expect(online()).toBe(false);
+  });
+
+  it('comes back as soon as any one listener reaches the server again', () => {
+    report(true, 'restrooms');
+    report(true, 'buildings');
+    jest.advanceTimersByTime(OFFLINE_GRACE_MS);
+    expect(online()).toBe(false);
+
+    report(false, 'buildings');
+    expect(online()).toBe(true);
   });
 
   it('cancels a pending verdict on teardown', () => {

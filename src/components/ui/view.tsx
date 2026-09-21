@@ -18,6 +18,9 @@ export type ViewProps = Pick<
   | 'accessibilityLabel'
   | 'accessibilityRole'
   | 'accessibilityLiveRegion'
+  // A progressbar announces nothing without it — role alone gives no number.
+  // `step-indicator.tsx` is the first thing here that needs one.
+  | 'accessibilityValue'
   // Android's half of hiding a decorative glyph from the a11y tree; used by Icon.
   | 'importantForAccessibility'
 >;

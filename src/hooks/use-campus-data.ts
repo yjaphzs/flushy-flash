@@ -5,7 +5,7 @@ import { subscribeToRestrooms } from '@/features/restrooms/api';
 import { firebaseErrorMessage } from '@/lib/firebase-errors';
 import { useUid } from '@/stores/auth-store';
 import { useCampusStore } from '@/stores/campus-store';
-import { useConnectionStore } from '@/stores/connection-store';
+import { useConnectionStore, type ConnectionSource } from '@/stores/connection-store';
 
 /** First automatic retry. Doubles per consecutive failure, capped at 30s. */
 const RETRY_MS = 4000;
@@ -53,12 +53,17 @@ export function useCampusData() {
     let live = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    // Both listeners report, and either one proving a server round-trip is
-    // enough to clear the offline state. They share one Firestore client, so
-    // they flip together anyway — taking whichever speaks last is self-healing
-    // rather than a race.
-    const onMeta = (fromCache: boolean) => {
-      if (live) useConnectionStore.getState().report(fromCache);
+    /*
+      ⚠️ Each listener reports under its OWN name, and that is load-bearing.
+
+      They used to share one flag, so whichever spoke last won — `restrooms`
+      reporting a live snapshot then `buildings` reporting a cached one left an
+      online phone stuck offline with its writes blocked, because nothing
+      further arrived to correct it. The store now keeps them apart and treats
+      one server-backed listener as proof.
+    */
+    const onMeta = (source: ConnectionSource) => (fromCache: boolean) => {
+      if (live) useConnectionStore.getState().report(source, fromCache);
     };
 
     // By the time this runs the listener is already detached, so there is
@@ -73,8 +78,8 @@ export function useCampusData() {
       }, delay);
     };
 
-    const unsubBuildings = subscribeToBuildings(setBuildings, fail, onMeta);
-    const unsubRestrooms = subscribeToRestrooms(setRestrooms, fail, onMeta);
+    const unsubBuildings = subscribeToBuildings(setBuildings, fail, onMeta('buildings'));
+    const unsubRestrooms = subscribeToRestrooms(setRestrooms, fail, onMeta('restrooms'));
 
     return () => {
       live = false;
