@@ -21,7 +21,7 @@ import { RestroomSheet } from '@/features/restrooms/components/restroom-sheet';
 import { CampusStatus, NearestStatus } from '@/features/restrooms/components/map-status';
 import { SearchingDialog } from '@/features/restrooms/components/searching-dialog';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
-import { AddRestroomButton } from '@/components/common/add-restroom-button';
+import { ADD_BUTTON_SIZE, AddRestroomButton } from '@/components/common/add-restroom-button';
 import { Screen } from '@/components/layouts/screen';
 import {
   TAB_BAR_HEIGHT,
@@ -62,6 +62,27 @@ export default function MapScreen() {
    * `bottom: clearance` left the watermark floating in the middle of the gap.
    */
   const ornamentBottom = tabBarOffset + TAB_BAR_HEIGHT + 4 - MAPLIBRE_ORNAMENT_MARGIN;
+
+  /**
+   * The compass goes bottom-RIGHT, stacked directly over the add button.
+   *
+   * ⚠️ This breaks the "one home per corner" rule in AGENTS.md §13 on purpose,
+   * and only for the compass. The attribution ⓘ stays bottom-left because OSM
+   * attribution is a licence condition and the left corner is where it is
+   * reliably visible; the compass is a control, and a control belongs with the
+   * other control rather than stacked on top of a legal notice.
+   *
+   * Same `MAPLIBRE_ORNAMENT_MARGIN` subtraction as the attribution, for the
+   * same reason — the native side adds the system window insets to whichever
+   * edges the gravity uses, and that margin is not configurable.
+   *
+   * ⚠️ It will usually be INVISIBLE, and that is correct. `compassHiddenFacingNorth`
+   * defaults to true, so MapLibre fades the compass out whenever the map faces
+   * north — which is nearly always. It appears when the user rotates, which is
+   * the only moment a north arrow means anything. Do not set that prop to false
+   * to "fix" a compass you cannot see; rotate the map instead.
+   */
+  const compassBottom = clearance + ADD_BUTTON_SIZE + 8 - MAPLIBRE_ORNAMENT_MARGIN;
 
   /**
    * Measured, not computed: the row is a 48pt disc beside a text field whose
@@ -216,21 +237,27 @@ export default function MapScreen() {
            floating in the gap between the tiles and the pill, belonging to
            neither.
 
-           What remains is aligned to the BAR's own geometry rather than the
-           map's, so it reads as attached to the pill and moves with it:
-           TAB_BAR_INSET matches the pill's left edge, and the vertical is the
-           pill's top edge plus a small gap.
+           The ⓘ is aligned to the BAR's own geometry rather than the map's, so
+           it reads as attached to the pill and moves with it: TAB_BAR_INSET
+           matches the pill's left edge, and the vertical is the pill's top
+           edge plus a small gap.
 
            ⚠️ It may not slide UNDER the pill: GlassSurface is translucent, so
            that is a murky smear rather than a hiding place, and visibility is
            the licence condition.
 
+           ⚠️ THE TWO ORNAMENTS NO LONGER SHARE A CORNER. The compass went
+           bottom-RIGHT, over the add button — see `compassBottom`. That is a
+           deliberate departure from "one home per corner", because the ⓘ is a
+           legal notice and the compass is a control, and stacking a control on
+           a notice makes the notice harder to reach.
+
            OrnamentViewPosition requires one vertical AND one horizontal key, so
-           these cannot be nudged on a single axis. */
+           neither can be nudged on a single axis. */
         logo={false}
         compass
         attributionPosition={{ bottom: ornamentBottom, left: TAB_BAR_INSET }}
-        compassPosition={{ bottom: ornamentBottom + 44, left: TAB_BAR_INSET }}
+        compassPosition={{ bottom: compassBottom, right: TAB_BAR_INSET }}
         /* The search row covers the top of the map, so the VISUAL centre is not
            the screen centre. Without this, onRegionDidChange reports a centre
            half a bar too high and visiblePins sorts its MAX_PINS cut against a

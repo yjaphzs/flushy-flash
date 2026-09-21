@@ -39,6 +39,17 @@ import { Icon } from '@/components/ui/icon';
  * sees the button and meets the gate at the route. Hiding it would make the app
  * look broken to someone who is simply browsing.
  */
+/**
+ * The rendered square, in points.
+ *
+ * Not a style — it is the CONSEQUENCE of `size="md"` plus `isIconOnly`, which
+ * heroui turns into `aspect-ratio: 1` on a 48pt-high button. Exported because
+ * the map screen stacks the compass directly above this button and would
+ * otherwise carry a bare 48 with nothing linking it to the size that produced
+ * it. If the size prop changes, this must change with it.
+ */
+export const ADD_BUTTON_SIZE = 48;
+
 export function AddRestroomButton({ onPress }: { onPress: () => void }) {
   return (
     <Button
