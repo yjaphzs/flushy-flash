@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 
-import { StaticMapImageManager, toLngLat, useMapStyle } from '@/components/common/map';
+import {
+  StaticMapImageManager,
+  toLngLat,
+  useMapStyle,
+  useMapStyleId,
+} from '@/components/common/map';
 import type { LatLng } from '@/lib/campus';
 
 /**
@@ -35,12 +40,21 @@ export function useStaticMap(
   size: { width: number; height: number },
 ): StaticMap {
   const mapStyle = useMapStyle();
+  const styleId = useMapStyleId();
   const [result, setResult] = useState<{ key: string; uri: string | null } | null>(null);
 
-  // Keyed so a moved pin or a scheme change re-renders, and so the answer is
-  // derived rather than reset in an effect body.
+  /*
+    Keyed so a moved pin, a resize or a THEME change re-renders, and so the
+    answer is derived rather than reset in an effect body.
+
+    ⚠️ `styleId` is in here because the comment above it used to claim "a
+    scheme change re-renders" while the key contained no scheme at all — so
+    this thumbnail kept whatever palette it was first baked with until the pin
+    moved. Now that the theme is a user setting rather than an OS one, that
+    would be a picked setting visibly not applying.
+  */
   const key = point
-    ? `${point.lat.toFixed(6)},${point.lng.toFixed(6)},${size.width}x${size.height}`
+    ? `${point.lat.toFixed(6)},${point.lng.toFixed(6)},${size.width}x${size.height},${styleId}`
     : null;
 
   useEffect(() => {
@@ -69,8 +83,10 @@ export function useStaticMap(
     return () => {
       live = false;
     };
-    // `mapStyle` is a fresh object each render; `key` already encodes everything
-    // that should re-trigger a snapshot, and adding it would loop.
+    // `key` already encodes everything that should re-trigger a snapshot,
+    // including the theme. `mapStyle` is excluded deliberately — it is one of
+    // two module constants, so depending on it would be harmless but redundant,
+    // and `point`/`size` are objects that would re-fire on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 

@@ -1,6 +1,11 @@
 import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec';
 
-import { DARK_MAP_STYLE, LIGHT_MAP_STYLE, tilePackStyle } from '@/components/common/map-style';
+import {
+  DARK_MAP_STYLE,
+  LIGHT_MAP_STYLE,
+  isDarkMap,
+  tilePackStyle,
+} from '@/components/common/map-style';
 import { DARK, LIGHT } from '@/components/common/map-style/palette';
 
 /**
@@ -95,5 +100,38 @@ describe('offline tile pack style', () => {
   it('drops the symbol layers and nothing else', () => {
     const expected = LIGHT_MAP_STYLE.layers.filter((l) => l.type !== 'symbol').map((l) => l.id);
     expect(tilePackStyle().layers.map((l) => l.id)).toEqual(expected);
+  });
+});
+
+/**
+ * The theme resolution, which is the whole of the user-facing setting.
+ *
+ * Pure on purpose — `isDarkMap` was lifted out of `useMapStyle` so this needs
+ * no renderer and no mock of `useColorScheme`, which react-native re-exports
+ * through a getter that is awkward to replace under jest.
+ */
+describe('isDarkMap', () => {
+  it('follows the OS on the default setting', () => {
+    expect(isDarkMap('system', 'dark')).toBe(true);
+    expect(isDarkMap('system', 'light')).toBe(false);
+  });
+
+  /**
+   * ⚠️ The point of the setting: an explicit choice must WIN over the OS, or
+   * a user on a light phone can never have a dark map.
+   */
+  it('overrides the OS when the user has chosen', () => {
+    expect(isDarkMap('dark', 'light')).toBe(true);
+    expect(isDarkMap('light', 'dark')).toBe(false);
+  });
+
+  /**
+   * `ColorSchemeName` has THREE inhabitants in RN 0.86, not two — 'unspecified'
+   * means the OS has no opinion, and it resolved to light before this setting
+   * existed. (`useColorScheme()` is typed non-nullable here, so there is no
+   * null case: asserting one was a type error this test originally shipped.)
+   */
+  it('treats an unspecified OS answer as light', () => {
+    expect(isDarkMap('system', 'unspecified')).toBe(false);
   });
 });

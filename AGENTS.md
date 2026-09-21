@@ -837,11 +837,28 @@ restroom" moved off the centre slot to a compact button on the map and a row on
 Profile, so the contribution path did not leave with the FAB.
 
 **Map chrome has one home per corner**, and it is deliberate: status banners
-across the TOP, the add button bottom-right, and the MapLibre ornaments
-bottom-left above the pill. The ornaments were at the top until the banners
-needed that band — **OSM attribution is a licence condition**, so wherever it
-goes it must be genuinely visible, and `OrnamentViewPosition` takes one vertical
-AND one horizontal key, so it cannot be nudged on a single axis.
+across the TOP, the add button and the compass bottom-right, and the OSM
+attribution ⓘ bottom-left above the pill. The ornaments were at the top until
+the banners needed that band — **OSM attribution is a licence condition**, so
+wherever it goes it must be genuinely visible, and `OrnamentViewPosition` takes
+one vertical AND one horizontal key, so it cannot be nudged on a single axis.
+
+⚠️ **The two MapLibre ornaments no longer share a corner.** The compass sits
+bottom-RIGHT, stacked over the add button at `clearance + ADD_BUTTON_SIZE + 8
+- MAPLIBRE_ORNAMENT_MARGIN`; the ⓘ stays bottom-left. A control belongs with
+the other control, and stacking a control on a legal notice makes the notice
+harder to reach. `ADD_BUTTON_SIZE` is exported from `add-restroom-button.tsx`
+rather than written as 48, because 48 is the *consequence* of `size="md"` plus
+`isIconOnly`, not a number anyone chose.
+
+⚠️ **The compass is invisible most of the time, and that is correct.**
+`compassHiddenFacingNorth` defaults to **true**, so MapLibre fades it out
+whenever the map faces north — which is nearly always. It appears on rotation,
+the only moment a north arrow means anything. Do not set that prop to false to
+"fix" a compass you cannot see; rotate the map instead. The prop names are also
+RN-specific: `compass` / `compassPosition`, **not** `compassEnabled`, and
+`compassViewMargins` / `compassViewPosition` do not exist as RN props at all —
+they are Mapbox-RN names that appear only inside the Obj-C bridge.
 
 **Nearest-search banners clear themselves.** `dismiss()` sat in
 `map-focus-store.ts` unused for a long time, so every outcome stayed on screen
@@ -1098,10 +1115,42 @@ which is a visible broken state rather than an invisible wasted one.
 
 **The map is a hand-authored theme**, not a hosted style:
 `src/components/common/map-style/` builds a `StyleSpecification` object over
-OpenFreeMap's keyless vector tiles, in light and dark, following
-`useColorScheme()`. `map-style.test.ts` runs the official MapLibre validator over
-both — worth keeping, because an invalid layer does not throw, it silently
-vanishes from the map.
+OpenFreeMap's keyless vector tiles, in light and dark. `map-style.test.ts` runs
+the official MapLibre validator over both — worth keeping, because an invalid
+layer does not throw, it silently vanishes from the map.
+
+**Which of the two draws is now the USER's choice**, in Settings: `system`
+(the default, and exactly the old `useColorScheme()` behaviour) · `light` ·
+`dark`. `stores/map-theme-store.ts` holds it, `lib/map-theme-storage.ts`
+persists it, and `isDarkMap(theme, scheme)` in `map-style/index.ts` is the pure
+resolver both the hook and its test use. Four things about it:
+
+- ⚠️ **Seeded synchronously from disk at module scope.** MapLibre reloads and
+  visibly re-draws the whole map when `mapStyle`'s IDENTITY changes, so a theme
+  arriving one tick late flashes the wrong palette on every cold start. This is
+  also why `useMapStyle()` returns one of two module constants and never builds
+  a style object.
+- ⚠️ **`expo-file-system`'s synchronous `File` API, not AsyncStorage.** There
+  is no AsyncStorage or MMKV in this project and one enum does not justify one;
+  `lib/photo-url-cache.ts` is the template. Unlike that cache this one is not
+  merely an optimisation — losing it reverts a setting somebody chose — so it
+  validates what it reads rather than casting.
+- ⚠️ **It is the MAP's theme, not the app's.** App chrome still follows the
+  OS, so a dark map under a light app is a choice, not a disagreement to
+  reconcile. The Settings control says "Map theme" for that reason.
+- **The offline pack is unaffected.** `tilePackStyle()` pins `LIGHT_MAP_STYLE`
+  because vector tiles carry no colour, so both palettes download byte-identical
+  tiles. **Satellite was considered and declined**: it needs a raster provider
+  with its own ToS and attribution, has no dark variant, and would make that
+  sentence false — the pack would hold vector tiles for a map drawing someone
+  else's raster, whose symptom is a downloaded map that is still blank offline,
+  with no error anywhere.
+
+⚠️ **`use-static-map.ts` keys its snapshot on `useMapStyleId()`.** Its comment
+claimed a scheme change re-rendered the thumbnail while the key contained no
+scheme at all, so the pin preview kept whatever palette it was first baked with
+until the pin moved. Now that the theme is a setting rather than an OS state,
+that would be a picked setting visibly not applying.
 
 **Cold start shows a loading screen**, not `null`. `_layout.tsx` used to
 `return null` until auth hydrated, which meant `AppProviders` — and so uniwind's

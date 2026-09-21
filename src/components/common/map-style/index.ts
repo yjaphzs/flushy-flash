@@ -1,11 +1,13 @@
 import { useMemo } from 'react';
-import { useColorScheme } from 'react-native';
+import { type ColorSchemeName, useColorScheme } from 'react-native';
 import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 
 import { labelLayers } from '@/components/common/map-style/layers-labels';
 import { landLayers } from '@/components/common/map-style/layers-land';
 import { roadLayers } from '@/components/common/map-style/layers-roads';
 import { DARK, LIGHT, type MapPalette } from '@/components/common/map-style/palette';
+import type { MapTheme } from '@/lib/map-theme-storage';
+import { useMapTheme } from '@/stores/map-theme-store';
 
 /**
  * A hand-authored MapLibre theme, replacing OpenFreeMap's stock `liberty` style.
@@ -78,18 +80,63 @@ export function tilePackStyle(): StyleSpecification {
 }
 
 /**
- * The style for the current colour scheme.
+ * The style the map should draw with.
  *
- * `useColorScheme()` from react-native is the source because there is no in-app
- * theme toggle and heroui-native exports no `useTheme` — the OS is the only
- * authority the rest of the app answers to as well. **If a toggle is ever
- * added, this must move to the same store**, or the map will be the one surface
- * that disagrees with it.
+ * This docblock used to say the OS was the source "because there is no in-app
+ * theme toggle", and that **if a toggle is ever added, this must move to the
+ * same store**. It was added; this is that move.
  *
- * Memoised on the scheme, not rebuilt per render: changing `mapStyle` identity
- * makes MapLibre reload the whole style, which visibly re-draws the map.
+ * `map-theme-store` wins, and falls back to `useColorScheme()` on `'system'`,
+ * which is both the default and exactly the old behaviour — so an install
+ * that never opens Settings sees no change at all.
+ *
+ * ⚠️ **The map's theme is deliberately NOT the app's.** App chrome still
+ * follows the OS, so someone can run a dark map under a light app. That is the
+ * setting they asked for rather than a disagreement to reconcile; the store's
+ * docblock carries the argument.
+ *
+ * ⚠️ **Returns one of two module-level constants, never a fresh object.**
+ * Changing `mapStyle`'s IDENTITY makes MapLibre reload the entire style and
+ * visibly re-draw the map, so building a style per render would flicker on
+ * every state change anywhere in the screen. The `useMemo` is belt and braces
+ * on top of that — the constants are what actually make it safe.
  */
 export function useMapStyle(): StyleSpecification {
-  const scheme = useColorScheme();
-  return useMemo(() => (scheme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE), [scheme]);
+  const dark = useDarkMap();
+  return useMemo(() => (dark ? DARK_MAP_STYLE : LIGHT_MAP_STYLE), [dark]);
+}
+
+/**
+ * The stored choice resolved against the OS.
+ *
+ * A pure function rather than logic inside the hook so it can be tested
+ * without a renderer and without mocking `useColorScheme`, which under jest
+ * means replacing a module react-native re-exports through a getter.
+ *
+ * `ColorSchemeName` has THREE inhabitants in RN 0.86, not two: `'light'`,
+ * `'dark'` and `'unspecified'` — the last meaning the OS has no opinion.
+ * `useColorScheme()` is typed non-nullable here, so there is no null case to
+ * handle. `'unspecified'` resolves to light, which is what the old
+ * `scheme === 'dark'` did, so the previous behaviour is preserved exactly.
+ */
+export function isDarkMap(theme: MapTheme, scheme: ColorSchemeName): boolean {
+  return theme === 'system' ? scheme === 'dark' : theme === 'dark';
+}
+
+/** One derivation, two consumers. */
+function useDarkMap(): boolean {
+  return isDarkMap(useMapTheme(), useColorScheme());
+}
+
+/**
+ * Which style `useMapStyle()` would return, as a string that can go in a key.
+ *
+ * ⚠️ For CACHING something rendered from the style, which is a different
+ * question from "give me the style". `use-static-map.ts` bakes a PNG and has
+ * to know when that PNG is stale — and it cannot compare style objects,
+ * because both are module constants that never change identity even when the
+ * choice between them does.
+ */
+export function useMapStyleId(): 'light' | 'dark' {
+  return useDarkMap() ? 'dark' : 'light';
 }

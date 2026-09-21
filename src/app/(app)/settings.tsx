@@ -12,6 +12,7 @@ import { refreshClaims, resendVerification } from '@/features/auth/api';
 import { authErrorMessage } from '@/features/auth/errors';
 import { useRequestWrite } from '@/features/auth/use-auth-gate';
 import { useAuthStatus, useAuthStore, useIsVerifiedStudent } from '@/stores/auth-store';
+import { MapThemeRow } from '@/features/map-theme/components/map-theme-row';
 import { OfflineMapRow } from '@/features/offline-map/components/offline-map-row';
 import { UpdateRow } from '@/features/updates/components/update-row';
 import { DeleteAccountRow } from '@/features/auth/components/delete-account-row';
@@ -143,12 +144,18 @@ export default function SettingsScreen() {
         </ActionGroup>
       </View>
 
-      <View className="gap-2">
+      <View className="gap-4">
         <Text type="h4">This device</Text>
         <ActionGroup>
           <OfflineMapRow />
           <UpdateRow />
         </ActionGroup>
+        {/*
+          Outside the ActionGroup on purpose: that component draws a list of
+          separator-divided ROWS, and this is a labelled choice of three, not a
+          row with a destination.
+        */}
+        <MapThemeRow />
       </View>
 
       {isGuest ? (

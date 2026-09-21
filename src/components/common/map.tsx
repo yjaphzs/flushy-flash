@@ -177,4 +177,4 @@ export const MAP_STYLE = MAP_STYLE_URL;
  * The app's own theme, light and dark. Exported from here so `mapStyle` callers
  * keep going through the one file that names MapLibre (AGENTS.md §8).
  */
-export { useMapStyle } from '@/components/common/map-style';
+export { useMapStyle, useMapStyleId } from '@/components/common/map-style';
