@@ -21,10 +21,20 @@ import type { RestroomFormState } from '@/features/restrooms/use-restroom-form';
  * readable at once, which is the thing that goes wrong when a wizard's steps
  * drift apart.
  *
- * ⚠️ **Every step stays MOUNTED.** The track translates; steps are not
- * conditionally rendered. Unmounting step 2 would drop the picked photos, which
- * are local file URIs — the same constraint that forces steps to be state
- * rather than routes.
+ * ⚠️ **Only the active step is rendered, and that is safe** — a point worth
+ * writing down because the opposite looks true. Every value lives in
+ * `use-restroom-form.ts`, which is held by the SCREEN; these bodies are
+ * stateless views over it and `PhotoPicker` has no `useState` at all. So
+ * unmounting step 2 cannot drop a picked photo.
+ *
+ * What genuinely must not unmount is `/submit` itself, which is why steps are
+ * screen state rather than routes: the placer is a full-screen sibling modal,
+ * and losing the screen would lose the local file URIs with it.
+ *
+ * Rendering all four side by side in a translating track was the first attempt
+ * and it has a plain defect: a row is as tall as its tallest child, so step 1 —
+ * one button — inherited the height of step 4's chips and summary and sat in
+ * about eight hundred points of void.
  */
 
 export type SubmitStepsProps = {

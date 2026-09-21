@@ -95,16 +95,22 @@ describe('SubmitRestroomScreen, as a stepper', () => {
   });
 
   /**
-   * Every step stays mounted so the track can slide — and, more importantly, so
-   * picked photos survive the round trip to the full-screen placer.
+   * The whole point of the change: a few fields at a time.
+   *
+   * Only the active step is rendered. That is safe because every value lives in
+   * `useRestroomForm`, held by this screen — the step bodies are stateless views
+   * and `PhotoPicker` has no state of its own, so unmounting one cannot drop a
+   * picked photo. (An earlier attempt kept all four in a translating row and
+   * gave step 1 the height of step 4, which is what sent it this way.)
    */
-  it('keeps later steps mounted rather than swapping them in', async () => {
+  it('shows one step at a time and nothing from the others', async () => {
     await render(<SubmitRestroomScreen />);
 
-    // Step 3's landmark field and step 4's amenities exist from the start, off
-    // to the side. `getAllBy` because the summary names some of them too.
-    expect(screen.getAllByText('Landmark').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Amenities').length).toBeGreaterThan(0);
-    expect(screen.getByText('Before you save')).toBeOnTheScreen();
+    expect(screen.getByText('Where is it?')).toBeOnTheScreen();
+
+    expect(screen.queryByText('Landmark')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Amenities')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Photos')).not.toBeOnTheScreen();
+    expect(screen.queryByText('Before you save')).not.toBeOnTheScreen();
   });
 });

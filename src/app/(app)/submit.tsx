@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { router } from 'expo-router';
 
 import { FormMessage } from '@/components/feedback/form-message';
@@ -36,15 +36,19 @@ import { useCanWrite, useUid } from '@/stores/auth-store';
 const SWIPE_SLOP = 12;
 /** How far a drag must go to count as a step rather than a wobble. */
 const SWIPE_COMMIT = 60;
+/** How far a newly shown step travels in. Short — it is a hint, not a journey. */
+const SLIDE_IN = 36;
 
 const TITLES = STEPS.map((s) => s.title);
 
 /**
  * Add a restroom, four steps at a time.
  *
- * ⚠️ **The steps are in-screen state and every one stays mounted.** A
- * step-per-route stepper would unmount this screen when the full-screen placer
- * opens, and picked photos are local file URIs — see `pin-draft-store.ts`.
+ * ⚠️ **The steps are in-screen state, not routes.** A step-per-route stepper
+ * would unmount this screen when the full-screen placer opens, and the picked
+ * photos are local file URIs held by `useRestroomForm` here — see
+ * `pin-draft-store.ts`. Unmounting an individual STEP is harmless, though; the
+ * bodies are stateless views over that hook.
  *
  * ⚠️ **Next lives in the scroll flow, not a fixed footer.** There is no
  * KeyboardAvoidingView in this codebase and no keyboard-controller package;
@@ -64,22 +68,34 @@ export default function SubmitRestroomScreen() {
 
   const quota = usePendingQuota(uid);
 
-  const [width, setWidth] = useState(0);
-  const x = useSharedValue(0);
-  const drag = useSharedValue(0);
-
   /*
-    The track's resting position. Written in an effect and read in a worklet —
-    a worklet closing over `steps.index` would re-run on change and SNAP rather
-    than travel, which looks identical to no animation at all.
-  */
-  useEffect(() => {
-    const to = -steps.index * width;
-    x.set(reduced || width === 0 ? to : withSpring(to, SPRING));
-  }, [steps.index, width, x, reduced]);
+    One step is rendered at a time and slides in from the side it came from.
 
-  const trackStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: x.get() + drag.get() }],
+    ⚠️ A four-wide track was the first attempt and had to go: a row is as tall
+    as its tallest child, so step 1 — a single button — inherited step 4's
+    height and sat in a screenful of nothing.
+
+    Written in an effect and read in a worklet. A worklet closing over
+    `steps.index` would re-run on change and SNAP, which looks exactly like no
+    animation at all (AGENTS.md §3).
+  */
+  const enter = useSharedValue(0);
+  const drag = useSharedValue(0);
+  const seen = useRef(steps.index);
+
+  useEffect(() => {
+    const from = steps.index >= seen.current ? SLIDE_IN : -SLIDE_IN;
+    seen.current = steps.index;
+    if (reduced) {
+      enter.set(0);
+      return;
+    }
+    enter.set(from);
+    enter.set(withSpring(0, SPRING));
+  }, [steps.index, enter, reduced]);
+
+  const stepStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: enter.get() + drag.get() }],
   }));
 
   /*
@@ -139,28 +155,16 @@ export default function SubmitRestroomScreen() {
         onSelect={steps.goTo}
       />
 
-      {/*
-        One track holding all four steps side by side, clipped to the screen.
-        Each step is `width` wide, so the track is 4x and translateX picks one.
-      */}
-      <View className="overflow-hidden" onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-        <GestureDetector gesture={swipe}>
-          <Animated.View style={[{ flexDirection: 'row', width: width * STEPS.length }, trackStyle]}>
-            <View style={{ width }}>
-              <StepWhere fields={fields} />
-            </View>
-            <View style={{ width }}>
-              <StepPhoto fields={fields} maxPhotos={form.maxPhotos} pickPhotos={form.pickPhotos} />
-            </View>
-            <View style={{ width }}>
-              <StepFinding fields={fields} />
-            </View>
-            <View style={{ width }}>
-              <StepDetails fields={fields} onJump={steps.goTo} />
-            </View>
-          </Animated.View>
-        </GestureDetector>
-      </View>
+      <GestureDetector gesture={swipe}>
+        <Animated.View style={stepStyle}>
+          {steps.index === 0 ? <StepWhere fields={fields} /> : null}
+          {steps.index === 1 ? (
+            <StepPhoto fields={fields} maxPhotos={form.maxPhotos} pickPhotos={form.pickPhotos} />
+          ) : null}
+          {steps.index === 2 ? <StepFinding fields={fields} /> : null}
+          {steps.index === 3 ? <StepDetails fields={fields} onJump={steps.goTo} /> : null}
+        </Animated.View>
+      </GestureDetector>
 
       {/*
         Only once it matters, and only on the step that saves. A quota line on
