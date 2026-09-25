@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "5.2.14",
-    "@legendapp/list": "3.3.11",
+    "@legendapp/list": "3.4.0",
     "@maplibre/maplibre-react-native": "11.3.10",
     "@react-native-firebase/app": "26.4.0",
     "@react-native-firebase/auth": "26.4.0",
